@@ -5,94 +5,201 @@ import { MdDelete, MdWater, MdPark, MdHome } from "react-icons/md";
 export default function Sidebar({ onScan, filters, setFilters }) {
   const [open, setOpen] = useState(true);
 
+  const WIDTH_OPEN = 320;
+  const WIDTH_COLLAPSED = 72;
+
   const icons = {
-    waste: <MdDelete size={20} />,
-    water: <MdWater size={20} />,
-    vegetation: <MdPark size={20} />,
-    rooftop: <MdHome size={20} />,
+    waste: <MdDelete size={22} color="#E6EEF2" />,
+    water: <MdWater size={22} color="#E6EEF2" />,
+    vegetation: <MdPark size={22} color="#E6EEF2" />,
+    rooftop: <MdHome size={22} color="#E6EEF2" />,
   };
 
-  const toggleFilter = (key) =>
-    setFilters((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleFilter = (k) => setFilters((prev) => ({ ...prev, [k]: !prev[k] }));
 
   return (
-    <div
-      className={`absolute top-0 left-0 z-50 transition-all duration-300
-      ${open ? "w-80" : "w-16"}
-      h-full bg-[#0f1115] text-white shadow-2xl border-r border-neutral-800`}
+    <aside
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        height: "100vh",
+        width: open ? WIDTH_OPEN : WIDTH_COLLAPSED,
+        background: "linear-gradient(180deg,#0b0d10,#070809)",
+        borderRight: "1px solid rgba(255,255,255,0.05)",
+        zIndex: 999999, // ABOVE MAP ALWAYS
+        overflow: "hidden",
+        transition: "width 220ms ease",
+        display: "flex",
+        flexDirection: "column",
+        padding: open ? 24 : 8,
+      }}
     >
-      {/* Collapse Button */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="absolute -right-4 top-4 h-9 w-9 rounded-full
-        bg-neutral-900 hover:bg-neutral-800 flex items-center justify-center
-        border border-neutral-700 shadow-md transition"
-      >
-        {open ? <FiChevronLeft size={18} /> : <FiChevronRight size={18} />}
-      </button>
 
-      {/* Expanded Panel */}
+      {/* COLLAPSE BUTTON (fixed, always outside map layer) */}
+      {/* GLASS COLLAPSE BUTTON */}
+<button
+  onClick={() => setOpen((s) => !s)}
+  style={{
+    position: "absolute",
+    top: 24,
+    left: open ? WIDTH_OPEN - 12 : WIDTH_COLLAPSED - 12,
+    transform: "translateX(-50%)",
+    height: 44,
+    width: 44,
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.08)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    border: "1px solid rgba(255,255,255,0.15)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#ffffff",
+    cursor: "pointer",
+    boxShadow: "0 4px 18px rgba(0,0,0,0.45)",
+    transition: "left 220ms ease, background 200ms ease",
+    zIndex: 99999999,
+  }}
+>
+  {open ? <FiChevronLeft size={18} /> : <FiChevronRight size={18} />}
+</button>
+
+
+      {/* CONTENT AREA */}
       {open ? (
-        <div className="p-6 flex flex-col h-full gap-8">
+        <>
           {/* Header */}
-          <div>
-            <h1 className="text-4xl font-bold tracking-wide">SHARA</h1>
-            <p className="text-sm text-neutral-400 mt-1">
-              Satellite Health & Analysis
-            </p>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 36, fontWeight: 800, color: "#fff" }}>SHARA</div>
+            <div style={{ marginTop: 6, fontSize: 13, color: "#9aa0a6" }}>
+              Saving the planet, one step at a time
+            </div>
           </div>
 
           {/* Scan Button */}
           <button
             onClick={onScan}
-            className="py-3 text-lg rounded-xl bg-green-500 hover:bg-green-600 
-            shadow-lg w-full font-semibold transition"
+            style={{
+              width: "100%",
+              padding: "14px 10px",
+              fontSize: 17,
+              fontWeight: 700,
+              borderRadius: 14,
+              background: "linear-gradient(90deg,#34d399,#10b981)",
+              border: "none",
+              cursor: "pointer",
+              color: "#041014",
+              marginBottom: 24,
+              boxShadow: "0 6px 16px rgba(16,185,129,0.2)",
+            }}
           >
             Scan Area
           </button>
 
           {/* Filters */}
-          <div className="flex flex-col gap-4">
-            <h3 className="text-xl font-semibold">Filters</h3>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 14 }}>
+            Filters
+          </div>
 
-            <div className="flex flex-col gap-3">
-              {Object.keys(filters).map((key) => (
-                <label
-                  key={key}
-                  className="flex items-center gap-3 p-3 bg-neutral-800 rounded-lg 
-                  hover:bg-neutral-700 border border-neutral-700 cursor-pointer transition"
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {Object.keys(filters).map((k) => {
+              const on = filters[k];
+              return (
+                <div
+                  key={k}
+                  onClick={() => toggleFilter(k)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "12px",
+                    borderRadius: 14,
+                    background: on ? "rgba(50,213,131,0.08)" : "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.04)",
+                    cursor: "pointer",
+                  }}
                 >
-                  {icons[key]}
-                  <input
-                    type="checkbox"
-                    checked={filters[key]}
-                    onChange={() => toggleFilter(key)}
-                    className="w-4 h-4 accent-green-400"
-                  />
-                  <span className="capitalize text-sm">{key}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+                  <div style={{ width: 32, display: "flex", justifyContent: "center" }}>
+                    {icons[k]}
+                  </div>
 
-          {/* Extra spacing */}
-          <div className="flex-grow" />
+                  <div style={{ flex: 1, marginLeft: 8 }}>
+                    <div style={{ color: "white", fontWeight: 700, textTransform: "capitalize" }}>
+                      {k}
+                    </div>
+                    <div style={{ color: "#9aa0a6", fontSize: 12, marginTop: 3 }}>
+                      {k === "waste" && "illegal dumping, debris"}
+                      {k === "water" && "ponds, streams"}
+                      {k === "vegetation" && "trees, grass"}
+                      {k === "rooftop" && "solar, roof area"}
+                    </div>
+                  </div>
 
-          {/* Footer */}
-          <div className="text-neutral-500 text-xs">
-            © SHARA — Powered by ESRI & MapLibre
+                  {/* Toggle Chip */}
+                  <div
+                    style={{
+                      width: 44,
+                      height: 24,
+                      borderRadius: 999,
+                      background: on
+                        ? "linear-gradient(90deg,#34d399,#10b981)"
+                        : "rgba(255,255,255,0.07)",
+                      padding: 3,
+                      display: "flex",
+                      justifyContent: on ? "flex-end" : "flex-start",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: on ? "#041014" : "#0c0f11",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </>
       ) : (
-        // Collapsed mode (icons only)
-        <div className="flex flex-col items-center gap-6 pt-20">
-          {Object.keys(filters).map((key) => (
-            <div key={key} className="text-neutral-400 hover:text-white cursor-pointer">
-              {icons[key]}
+        /* COLLAPSED VIEW */
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 26,
+            paddingTop: 80,
+          }}
+        >
+          {Object.keys(filters).map((k) => (
+            <div key={k} style={{ opacity: filters[k] ? 1 : 0.35 }}>
+              {icons[k]}
             </div>
           ))}
         </div>
       )}
-    </div>
+
+      {/* Footer */}
+<div
+  style={{
+    marginTop: "auto",
+    paddingBottom: 26,
+    paddingTop: 14,
+    textAlign: "center",
+    color: "#8b9199",
+    fontSize: 13,
+    opacity: 0.75,
+    letterSpacing: 0.4,
+  }}
+>
+  SHARA · 2025
+</div>
+
+    </aside>
   );
 }
