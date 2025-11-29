@@ -11,8 +11,6 @@ use std::{env, net::SocketAddr, sync::Arc};
 use tower_http::cors::{CorsLayer, Any};
 use axum::serve;
 
-mod firestore;
-use firestore::Firestore;
 
 #[tokio::main]
 async fn main() {
@@ -30,8 +28,6 @@ async fn main() {
         .expect("missing FIREBASE_API_KEY");
     let project_id = env::var("FIREBASE_PROJECT_ID")
         .expect("missing FIREBASE_PROJECT_ID");
-
-    let firestore = Arc::new(Firestore::new(api_key, project_id));
 
     // Router
     let app = Router::new()

@@ -10,6 +10,8 @@ import {
   orderBy
 } from "firebase/firestore";
 
+import { getStorage } from "firebase/storage";
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -21,16 +23,19 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 const issuesRef = collection(db, "issues");
 
+// Save issue
 export async function saveIssue(issue) {
   await addDoc(issuesRef, {
     ...issue,
-    created: serverTimestamp(),
+    created: serverTimestamp()
   });
 }
 
+// Real-time issues
 export function listenIssues(callback) {
   const q = query(issuesRef, orderBy("created", "desc"));
   return onSnapshot(q, (snap) => {
@@ -40,4 +45,4 @@ export function listenIssues(callback) {
   });
 }
 
-export { db };
+export { db, storage };
