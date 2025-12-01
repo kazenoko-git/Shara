@@ -85,7 +85,11 @@ export default function App() {
       {page === "add" && (
         <AddIssue
           onBack={() => setPage("map")}
-          onSaved={() => setPage("map")}
+          onSaved={(saved) => {
+  console.log("saved", saved);
+  setPage("map");
+}}
+
         />
       )}
 

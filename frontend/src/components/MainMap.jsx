@@ -1,10 +1,11 @@
 // src/components/MainMap.jsx
 import React, { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 /**
  * Props:
- *  - issues: Firestore issues array
+ *  - issues: array
  *  - onSelectIssue(issue)
  *  - onAddIssue()
  *  - filters: object
@@ -20,25 +21,22 @@ export default function MainMap({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
 
-  // helper: safe accessor
-  const isMapReady = () => mapRef.current && mapRef.current.isStyleLoaded && mapRef.current.isStyleLoaded();
-
-  // Initialize map
+  // init map once
   useEffect(() => {
-    if (mapRef.current) return; // already inited
+    if (!containerRef.current) return;
+    if (mapRef.current) return;
 
     mapRef.current = new maplibregl.Map({
       container: containerRef.current,
       style: "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json",
       center: [77.216721, 28.6448],
       zoom: 12,
+      attributionControl: false,
     });
 
     mapRef.current.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-    // ensure empty source created AFTER style loads
-    const onLoad = () => {
-      console.log("🌍 MAP STYLE LOADED");
+    const initSource = () => {
       try {
         if (!mapRef.current.getSource("shara-issues")) {
           mapRef.current.addSource("shara-issues", {
@@ -46,15 +44,15 @@ export default function MainMap({
             data: { type: "FeatureCollection", features: [] },
           });
         }
-      } catch (err) {
-        console.warn("source init error", err);
+      } catch (e) {
+        console.warn("initSource error", e);
       }
     };
 
     if (mapRef.current.isStyleLoaded && mapRef.current.isStyleLoaded()) {
-      onLoad();
+      initSource();
     } else {
-      mapRef.current.once("load", onLoad);
+      mapRef.current.once("load", initSource);
     }
 
     return () => {
@@ -65,27 +63,25 @@ export default function MainMap({
     };
   }, []);
 
-  // Sync issues → source & layers (defensive)
+  // sync issues -> geojson, create layers, handlers
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    const ensureReadyThenRun = (fn) => {
-      if (map.isStyleLoaded && map.isStyleLoaded()) {
-        fn();
-      } else {
-        // wait for style load then run once
+    const ensure = (fn) => {
+      if (map.isStyleLoaded && map.isStyleLoaded()) fn();
+      else {
         const cb = () => {
-          try { fn(); } catch (e) { console.error(e); }
+          fn();
           map.off("load", cb);
         };
         map.on("load", cb);
       }
     };
 
-    ensureReadyThenRun(() => {
+    ensure(() => {
       const srcId = "shara-issues";
-      // Build filtered GeoJSON
+
       const features = (issues || [])
         .filter((it) => it.coords && Array.isArray(it.coords))
         .filter((it) => {
@@ -96,7 +92,7 @@ export default function MainMap({
         .map((it) => ({
           type: "Feature",
           properties: {
-            id: it.id ?? it._id ?? "",
+            id: it.id ?? "",
             title: it.title ?? "",
             description: it.description ?? it.desc ?? "",
             imageUrl: it.imageUrl ?? "",
@@ -107,7 +103,6 @@ export default function MainMap({
 
       const geo = { type: "FeatureCollection", features };
 
-      // update source safely
       try {
         if (map.getSource(srcId)) {
           map.getSource(srcId).setData(geo);
@@ -134,7 +129,7 @@ export default function MainMap({
                 "water", "#3B82F6",
                 "vegetation", "#22C55E",
                 "rooftop", "#F59E0B",
-                /* default */ "#CBD5E1",
+                "#CBD5E1",
               ],
               "circle-radius": [
                 "interpolate",
@@ -145,7 +140,7 @@ export default function MainMap({
                 16, 14,
               ],
               "circle-stroke-width": 1,
-              "circle-stroke-color": "rgba(255,255,255,0.25)",
+              "circle-stroke-color": "rgba(255,255,255,0.2)",
             },
           });
         } catch (err) {
@@ -153,7 +148,7 @@ export default function MainMap({
         }
       }
 
-      // heatmap layer toggle (if heatmap on, ensure added; else remove)
+      // heatmap toggle
       const heatLayerId = "shara-heat";
       if (heatmap) {
         if (!map.getLayer(heatLayerId)) {
@@ -178,7 +173,7 @@ export default function MainMap({
                   0.8, "rgb(239,68,68)",
                 ],
               },
-            }, "shara-circles"); // add below circles
+            }, "shara-circles");
           } catch (err) {
             console.warn("add heatmap failed", err);
           }
@@ -189,7 +184,7 @@ export default function MainMap({
         }
       }
 
-      // attach/reattach click handlers for circles (clear first)
+      // click handler
       const clickHandler = (e) => {
         try {
           const feat = e.features && e.features[0];
@@ -209,11 +204,7 @@ export default function MainMap({
         }
       };
 
-      // Remove any previous handlers safely
-      try {
-        map.off("click", "shara-circles", clickHandler);
-      } catch (e) {}
-
+      try { map.off("click", "shara-circles", clickHandler); } catch (e) {}
       try {
         map.on("click", "shara-circles", clickHandler);
         map.on("mouseenter", "shara-circles", () => (map.getCanvas().style.cursor = "pointer"));
@@ -223,10 +214,9 @@ export default function MainMap({
       }
     });
 
-    // cleanup not required here because handlers are re-bound each update
+    // no cleanup here (we rebind each run)
   }, [issues, filters, heatmap, onSelectIssue]);
 
-  // UI
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative" }}>
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />

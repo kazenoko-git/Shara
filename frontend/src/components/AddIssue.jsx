@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+// src/components/AddIssue.jsx
+import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { storage, saveIssue } from "../firebase"; // saveIssue is exported from firebase.js
+import { ref as storageRef, uploadBytes } from "firebase/storage";
+import { getDownloadURL } from "firebase/storage";
 
 export default function AddIssue({ onBack, onSaved }) {
   const mapEl = useRef(null);
@@ -10,17 +14,12 @@ export default function AddIssue({ onBack, onSaved }) {
   const [coords, setCoords] = useState(null);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [image, setImage] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    console.log("🔥 Mounting AddIssue map…");
+    if (!mapEl.current) return;
 
-    if (!mapEl.current) {
-      console.log("❌ mapEl is null → DOM not mounted yet");
-      return;
-    }
-
-    // --- CREATE MAP ---
     map.current = new maplibregl.Map({
       container: mapEl.current,
       style: "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json",
@@ -30,159 +29,211 @@ export default function AddIssue({ onBack, onSaved }) {
     });
 
     map.current.on("load", () => {
-      console.log("🟢 AddIssue map is LOADED");
+      map.current.resize();
+    });
 
-      // Force resize (MapLibre bug in portals)
-      setTimeout(() => {
-        map.current.resize();
-        console.log("🔧 Forced resize");
-      }, 50);
+    map.current.on("click", (e) => {
+      const { lng, lat } = e.lngLat;
+      setCoords([lng, lat]);
+      if (marker.current) marker.current.remove();
 
-      // Click handler
-      map.current.on("click", (e) => {
-        const { lng, lat } = e.lngLat;
-        setCoords([lng, lat]);
-
-        if (marker.current) marker.current.remove();
-
-        marker.current = new maplibregl.Marker({ color: "#10b981" })
-          .setLngLat([lng, lat])
-          .addTo(map.current);
-      });
+      marker.current = new maplibregl.Marker({ color: "#10b981" })
+        .setLngLat([lng, lat])
+        .addTo(map.current);
     });
 
     return () => {
       if (map.current) {
-        console.log("🧹 Unmounting AddIssue map");
         map.current.remove();
         map.current = null;
       }
     };
   }, []);
 
-  // --- SUBMIT ---
-  const submit = () => {
-    if (!coords) return alert("Tap the map to place a pin first!");
-    const issue = { title, desc, coords, imageUrl: "" };
-    onSaved(issue);
+  const handleFilePick = (f) => {
+    setImageFile(f);
+  };
+
+  const handleSubmit = async () => {
+    if (!coords) return alert("Tap the map to place a pin first.");
+    setSaving(true);
+
+    try {
+      let imageUrl = "";
+      if (imageFile) {
+        const sref = storageRef(storage, `issues/${Date.now()}-${imageFile.name}`);
+        await uploadBytes(sref, imageFile);
+        imageUrl = await getDownloadURL(sref);
+      }
+
+      const payload = {
+        title: title || "Untitled",
+        description: desc || "",
+        coords,
+        imageUrl,
+        category: "unverified",
+      };
+
+      const saved = await saveIssue(payload);
+      console.log("Saved issue", saved.id);
+
+      // call parent
+      if (onSaved) onSaved(saved);
+    } catch (err) {
+      console.error("Save failed", err);
+      alert("Save failed. See console.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        overflow: "hidden",
-        background: "#000", // fallback
-        zIndex: 99999,
-      }}
-    >
-      {/* MAP ITSELF */}
-      <div
-        ref={mapEl}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          zIndex: 1,
-        }}
-      />
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, overflow: "hidden" }}>
+      <div ref={mapEl} style={{ position: "absolute", inset: 0 }} />
 
-      {/* BACK BUTTON */}
+      {/* Back */}
       <button
         onClick={onBack}
         style={{
           position: "absolute",
           top: 20,
           left: 20,
-          zIndex: 20,
-          padding: "10px 18px",
-          background: "rgba(0,0,0,0.4)",
-          backdropFilter: "blur(12px)",
-          borderRadius: 14,
-          color: "white",
+          zIndex: 30,
+          padding: "10px 16px",
+          borderRadius: 12,
+          background: "rgba(0,0,0,0.45)",
+          color: "#fff",
           border: "none",
           cursor: "pointer",
-          fontWeight: 600,
+          backdropFilter: "blur(10px)",
         }}
       >
         ← Back
       </button>
 
-      {/* GLASS SHEET */}
+      {/* Floating CARD */}
       <div
         style={{
           position: "absolute",
-          bottom: 0,
-          width: "100%",
-          height: "260px",
-          padding: "20px",
-          background: "rgba(18,18,18,0.45)",
-          backdropFilter: "blur(30px)",
-          borderTop: "1px solid rgba(255,255,255,0.1)",
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          zIndex: 20,
+          left: "50%",
+          bottom: 36,
+          transform: "translateX(-50%)",
+          width: 760,
+          maxWidth: "92vw",
+          borderRadius: 16,
+          zIndex: 40,
+          padding: 20,
+          boxShadow: "0 20px 60px rgba(2,6,23,0.6)",
+          background: "linear-gradient(180deg, rgba(12,12,12,0.75), rgba(6,6,6,0.65))",
+          border: "1px solid rgba(255,255,255,0.04)",
+          backdropFilter: "blur(24px)",
         }}
       >
-        <h2
-          style={{
-            fontWeight: 700,
-            marginBottom: 10,
-            fontSize: 20,
-            color: "white",
-          }}
-        >
-          Add Issue
-        </h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <h3 style={{ color: "white", margin: 0, fontSize: 20 }}>Add Issue</h3>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 13 }}>
+            Tap map to place a pin
+          </div>
+        </div>
 
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title"
-          style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: 12,
-            background: "rgba(255,255,255,0.1)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            marginBottom: 10,
-            color: "white",
-          }}
-        />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: 14 }}>
+          <div>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title"
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.03)",
+                color: "white",
+                border: "1px solid rgba(255,255,255,0.06)",
+                marginBottom: 10,
+              }}
+            />
 
-        <textarea
-          value={desc}
-          onChange={(e) => setDesc(e.target.value)}
-          placeholder="Description"
-          rows={2}
-          style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: 12,
-            background: "rgba(255,255,255,0.1)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            marginBottom: 10,
-            color: "white",
-          }}
-        />
+            <textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="Description"
+              rows={4}
+              style={{
+                width: "100%",
+                padding: 12,
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.03)",
+                color: "white",
+                border: "1px solid rgba(255,255,255,0.06)",
+                resize: "vertical",
+              }}
+            />
+          </div>
 
-        <button
-          onClick={submit}
-          style={{
-            width: "100%",
-            padding: "14px",
-            borderRadius: 14,
-            background: "linear-gradient(90deg,#34d399,#10b981)",
-            color: "#041014",
-            fontWeight: 800,
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          Submit Issue
-        </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <label style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: 140,
+              borderRadius: 10,
+              border: "1px dashed rgba(255,255,255,0.06)",
+              background: "rgba(255,255,255,0.02)",
+              color: "white",
+              cursor: "pointer",
+              textAlign: "center",
+            }}>
+              {imageFile ? (
+                <img
+                  src={URL.createObjectURL(imageFile)}
+                  alt="preview"
+                  style={{ maxWidth: "100%", maxHeight: 140, objectFit: "cover", borderRadius: 8 }}
+                />
+              ) : (
+                <div style={{ padding: 8 }}>Upload image</div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFilePick(e.target.files[0])}
+                style={{ display: "none" }}
+              />
+            </label>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                style={{
+                  flex: 1,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "linear-gradient(90deg,#34d399,#10b981)",
+                  border: "none",
+                  color: "#041014",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {saving ? "Saving…" : "Save & Submit"}
+              </button>
+
+              <button
+                onClick={() => { setTitle(""); setDesc(""); setImageFile(null); }}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

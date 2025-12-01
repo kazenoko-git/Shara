@@ -1,4 +1,4 @@
-// firebase.js
+// src/firebase.js
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -7,9 +7,8 @@ import {
   onSnapshot,
   serverTimestamp,
   query,
-  orderBy
+  orderBy,
 } from "firebase/firestore";
-
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -22,27 +21,48 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const storage = getStorage(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
+// collection ref
 const issuesRef = collection(db, "issues");
 
-// Save issue
+/**
+ * Save an issue object to Firestore (handles timestamp).
+ * issue: { title, description, coords, imageUrl, category? }
+ */
 export async function saveIssue(issue) {
-  await addDoc(issuesRef, {
-    ...issue,
-    created: serverTimestamp()
-  });
+  // normalize fields
+  const payload = {
+    title: issue.title ?? "Untitled",
+    description: issue.description ?? issue.desc ?? "",
+    coords: issue.coords,
+    imageUrl: issue.imageUrl ?? "",
+    category: issue.category ?? "unverified",
+    created: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(issuesRef, payload);
+  return { id: docRef.id, ...payload };
 }
 
-// Real-time issues
+/**
+ * Real-time listener to issues collection.
+ * callback receives an array of issue objects: [{ id, ...data }]
+ * Returns unsubscribe function.
+ */
 export function listenIssues(callback) {
   const q = query(issuesRef, orderBy("created", "desc"));
-  return onSnapshot(q, (snap) => {
-    const arr = [];
-    snap.forEach((doc) => arr.push({ id: doc.id, ...doc.data() }));
-    callback(arr);
-  });
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      callback(arr);
+    },
+    (err) => {
+      console.error("listenIssues error", err);
+      callback([]);
+    }
+  );
+  return unsub;
 }
-
-export { db, storage };
