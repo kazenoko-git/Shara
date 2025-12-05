@@ -1,10 +1,11 @@
 // src/components/AddIssue.jsx
+
 import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { storage, saveIssue } from "../firebase"; // saveIssue is exported from firebase.js
-import { ref as storageRef, uploadBytes } from "firebase/storage";
-import { getDownloadURL } from "firebase/storage";
+
+import { saveIssue, storage } from "../firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function AddIssue({ onBack, onSaved }) {
   const mapEl = useRef(null);
@@ -17,6 +18,9 @@ export default function AddIssue({ onBack, onSaved }) {
   const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // -------------------------------
+  // MAP INIT
+  // -------------------------------
   useEffect(() => {
     if (!mapEl.current) return;
 
@@ -29,12 +33,13 @@ export default function AddIssue({ onBack, onSaved }) {
     });
 
     map.current.on("load", () => {
-      map.current.resize();
+      setTimeout(() => map.current.resize(), 50);
     });
 
     map.current.on("click", (e) => {
       const { lng, lat } = e.lngLat;
       setCoords([lng, lat]);
+
       if (marker.current) marker.current.remove();
 
       marker.current = new maplibregl.Marker({ color: "#10b981" })
@@ -43,42 +48,48 @@ export default function AddIssue({ onBack, onSaved }) {
     });
 
     return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
+      map.current?.remove();
+      map.current = null;
     };
   }, []);
-
-  const handleFilePick = (f) => {
-    setImageFile(f);
-  };
 
   const handleSubmit = async () => {
     if (!coords) return alert("Tap the map to place a pin first.");
     setSaving(true);
 
     try {
-      let imageUrl = "";
+      let imageUrl = null;
+
+      // -------------------------------
+      // UPLOAD IMAGE
+      // -------------------------------
       if (imageFile) {
-        const sref = storageRef(storage, `issues/${Date.now()}-${imageFile.name}`);
+        const filePath = `issues/${Date.now()}-${imageFile.name}`;
+        const sref = storageRef(storage, filePath);
         await uploadBytes(sref, imageFile);
         imageUrl = await getDownloadURL(sref);
       }
 
+      // -------------------------------
+      // CREATE PAYLOAD
+      // -------------------------------
       const payload = {
         title: title || "Untitled",
         description: desc || "",
         coords,
-        imageUrl,
+        imageUrl: imageUrl || null, // never empty string
         category: "unverified",
       };
 
-      const saved = await saveIssue(payload);
-      console.log("Saved issue", saved.id);
+      // -------------------------------
+      // SAVE TO FIRESTORE
+      // -------------------------------
+      const docRef = await saveIssue(payload);
 
-      // call parent
-      if (onSaved) onSaved(saved);
+      console.log("Saved issue →", docRef.id);
+
+      onSaved?.({ id: docRef.id, ...payload });
+
     } catch (err) {
       console.error("Save failed", err);
       alert("Save failed. See console.");
@@ -171,31 +182,39 @@ export default function AddIssue({ onBack, onSaved }) {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <label style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: 140,
-              borderRadius: 10,
-              border: "1px dashed rgba(255,255,255,0.06)",
-              background: "rgba(255,255,255,0.02)",
-              color: "white",
-              cursor: "pointer",
-              textAlign: "center",
-            }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 140,
+                borderRadius: 10,
+                border: "1px dashed rgba(255,255,255,0.06)",
+                background: "rgba(255,255,255,0.02)",
+                color: "white",
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
               {imageFile ? (
                 <img
                   src={URL.createObjectURL(imageFile)}
                   alt="preview"
-                  style={{ maxWidth: "100%", maxHeight: 140, objectFit: "cover", borderRadius: 8 }}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: 140,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                  }}
                 />
               ) : (
                 <div style={{ padding: 8 }}>Upload image</div>
               )}
+
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => handleFilePick(e.target.files[0])}
+                onChange={(e) => setImageFile(e.target.files[0])}
                 style={{ display: "none" }}
               />
             </label>
@@ -219,7 +238,11 @@ export default function AddIssue({ onBack, onSaved }) {
               </button>
 
               <button
-                onClick={() => { setTitle(""); setDesc(""); setImageFile(null); }}
+                onClick={() => {
+                  setTitle("");
+                  setDesc("");
+                  setImageFile(null);
+                }}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 10,

@@ -66,3 +66,22 @@ export function listenIssues(callback) {
   );
   return unsub;
 }
+
+export function listenMessages(issueId, groupId, callback) {
+  const msgsRef = collection(db, "issues", issueId, "groups", groupId, "messages");
+  const q = query(msgsRef, orderBy("created", "asc"));
+  return onSnapshot(q, snap => {
+    const arr = [];
+    snap.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+    callback(arr);
+  });
+}
+
+export async function sendMessage(issueId, groupId, message) {
+  const msgsRef = collection(db, "issues", issueId, "groups", groupId, "messages");
+  return addDoc(msgsRef, {
+    text: message.text,
+    userId: message.userId,
+    created: serverTimestamp(),
+  });
+}

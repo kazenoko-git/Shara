@@ -10,3 +10,4 @@ Thumbs.db
 .idea/
 target/
 venv/
+backend/ai-backend/.venv
