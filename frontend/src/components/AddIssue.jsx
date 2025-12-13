@@ -1,5 +1,4 @@
-// src/components/AddIssue.jsx
-
+// frontend/src/components/AddIssue.jsx
 import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -19,9 +18,6 @@ export default function AddIssue({ onBack, onSaved }) {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // -------------------------------
-  // MAP INIT
-  // -------------------------------
   useEffect(() => {
     if (!mapEl.current) return;
 
@@ -54,63 +50,41 @@ export default function AddIssue({ onBack, onSaved }) {
     };
   }, []);
 
-  // -------------------------------
-  // AI ANALYSIS
-  // -------------------------------
   const runAI = async (imageUrl) => {
-  setAiLoading(true);
-  try {
-    const res = await fetch("http://localhost:8000/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_url: imageUrl }),
-    });
+    setAiLoading(true);
+    try {
+      const res = await fetch("http://localhost:8000/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: imageUrl }),
+      });
 
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(txt || "AI failed");
+      if (!res.ok) throw new Error("AI failed");
+      const data = await res.json();
+      setAiResult(data);
+      return data;
+    } catch (e) {
+      console.warn("AI error", e);
+      setAiResult({ summary: "AI error or disabled.", confidence: 0, labels: [] });
+      return { summary: "AI error or disabled.", confidence: 0, labels: [] };
+    } finally {
+      setAiLoading(false);
     }
+  };
 
-    const data = await res.json();
-    setAiResult(data);
-    return data;
-  } catch (e) {
-    setAiResult({
-      summary: "AI unavailable. Image saved without analysis.",
-      confidence: 0,
-      labels: [],
-    });
-    return null;
-  } finally {
-    setAiLoading(false);
-  }
-};
-
-
-  // -------------------------------
-  // SUBMIT
-  // -------------------------------
   const handleSubmit = async () => {
     if (!coords) return alert("Place a pin first");
     if (!imageFile) return alert("Upload an image");
-
     setSaving(true);
 
     try {
-      // 1️⃣ Upload image
       const imageUrl = await uploadToCloudinary(imageFile);
 
-      // 2️⃣ Run AI
-      let ai = null;
-      try {
-        ai = await runAI(imageUrl);
-      } catch {}
+      const ai = await runAI(imageUrl);
 
-
-      // 3️⃣ Save issue
       const payload = {
         title: title || "Untitled",
-        description: desc,
+        description: desc || "",
         coords,
         imageUrl,
         ai,
@@ -123,14 +97,16 @@ export default function AddIssue({ onBack, onSaved }) {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error("Save failed: " + text);
+      }
 
       const saved = await res.json();
       onSaved?.(saved);
-
     } catch (err) {
-      console.error(err);
-      alert("Submission failed");
+      console.error("Save failed", err);
+      alert("Save failed: " + (err.message || err));
     } finally {
       setSaving(false);
     }
@@ -140,62 +116,35 @@ export default function AddIssue({ onBack, onSaved }) {
     <div style={{ position: "fixed", inset: 0, zIndex: 99999 }}>
       <div ref={mapEl} style={{ position: "absolute", inset: 0 }} />
 
-      {/* Back */}
       <button
         onClick={onBack}
-        style={{
-          position: "absolute",
-          top: 20,
-          left: 20,
-          zIndex: 30,
-          padding: "10px 16px",
-          borderRadius: 12,
-          background: "rgba(0,0,0,0.45)",
-          color: "#fff",
-          border: "none",
-        }}
+        style={{ position: "absolute", top: 20, left: 20, zIndex: 30, padding: "10px 16px", borderRadius: 12, background: "rgba(0,0,0,0.45)", color: "#fff", border: "none", }}
       >
         ← Back
       </button>
 
-      {/* Floating Card */}
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          bottom: 36,
-          transform: "translateX(-50%)",
-          width: 760,
-          maxWidth: "92vw",
-          borderRadius: 16,
-          padding: 20,
-          background: "rgba(12,12,12,0.75)",
-          backdropFilter: "blur(24px)",
-          color: "white",
-        }}
-      >
-        <h3>Add Issue</h3>
+      <div style={{
+        position: "absolute",
+        left: "50%",
+        bottom: 36,
+        transform: "translateX(-50%)",
+        width: 760,
+        maxWidth: "92vw",
+        borderRadius: 16,
+        padding: 20,
+        background: "rgba(12,12,12,0.85)",
+        backdropFilter: "blur(14px)",
+        color: "white",
+        zIndex: 40
+      }}>
+        <h3 style={{ margin: 0, fontSize: 20 }}>Add Issue</h3>
 
-        <input
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{ width: "100%", marginBottom: 8 }}
-        />
+        <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%", marginTop: 10, padding: 10 }} />
+        <textarea placeholder="Description" rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} style={{ width: "100%", marginTop: 8, padding: 10 }} />
 
-        <textarea
-          placeholder="Description"
-          value={desc}
-          onChange={(e) => setDesc(e.target.value)}
-          rows={3}
-          style={{ width: "100%", marginBottom: 8 }}
-        />
-
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setImageFile(e.target.files[0])}
-        />
+        <div style={{ marginTop: 8 }}>
+          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0])} />
+        </div>
 
         {aiLoading && <p>🔍 Running AI…</p>}
 
@@ -207,9 +156,14 @@ export default function AddIssue({ onBack, onSaved }) {
           </div>
         )}
 
-        <button onClick={handleSubmit} disabled={saving}>
-          {saving ? "Submitting…" : "Submit Issue"}
-        </button>
+        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+          <button onClick={handleSubmit} disabled={saving} style={{ flex: 1, padding: "12px 14px", borderRadius: 10, background: "#10b981", color: "#041014", fontWeight: 700 }}>
+            {saving ? "Submitting…" : "Submit Issue"}
+          </button>
+          <button onClick={() => { setTitle(""); setDesc(""); setImageFile(null); setAiResult(null); }} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.06)", color: "white" }}>
+            Clear
+          </button>
+        </div>
       </div>
     </div>
   );

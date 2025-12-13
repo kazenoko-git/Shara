@@ -1,20 +1,29 @@
+// frontend/src/utils/uploadToCloudinary.js
 export async function uploadToCloudinary(file) {
-  const form = new FormData();
-  form.append("file", file);
-  form.append("upload_preset", import.meta.env.VITE_CLOUDINARY_PRESET);
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const preset = import.meta.env.VITE_CLOUDINARY_PRESET;
 
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD}/image/upload`,
-    {
-      method: "POST",
-      body: form,
-    }
-  );
+  if (!cloudName || !preset) {
+    throw new Error("Cloudinary env vars not set (VITE_CLOUDINARY_CLOUD_NAME / VITE_CLOUDINARY_PRESET).");
+  }
+
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("upload_preset", preset);
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: fd,
+  });
 
   if (!res.ok) {
-    throw new Error("Cloudinary upload failed");
+    const text = await res.text();
+    throw new Error("Cloudinary upload failed: " + text);
   }
 
   const data = await res.json();
-  return data.secure_url;
+  return data.secure_url || data.url;
 }
+
+export default uploadToCloudinary;

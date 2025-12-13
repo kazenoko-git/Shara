@@ -1,146 +1,107 @@
-// src/components/GroupChat.jsx
+// frontend/src/components/GroupChat.jsx
 import React, { useEffect, useRef, useState } from "react";
 
-export default function GroupChat({ group, onMinimize }) {
+export default function GroupChat({ group, onBack, initialMinimized = false }) {
   const [msg, setMsg] = useState("");
-  const [messages, setMessages] = useState([
-    { id: 1, sender: "system", text: "Welcome to the group 👋" },
-  ]);
-
+  const [messages, setMessages] = useState([]);
+  const [minimized, setMinimized] = useState(initialMinimized);
   const bottomRef = useRef(null);
+  const userId = localStorage.getItem("userId") || "u_anonymous";
 
-  function sendMessage() {
+  useEffect(() => {
+    if (!group) return;
+    loadMessages();
+    const id = setInterval(() => loadMessages(), 3000);
+    return () => clearInterval(id);
+  }, [group]);
+
+  async function loadMessages() {
+    try {
+      const res = await fetch(`http://localhost:8000/groups/${group.id}/messages`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setMessages(data);
+    } catch (e) {
+      console.warn("load messages fail", e);
+    }
+  }
+
+  async function sendMessage() {
     if (!msg.trim()) return;
-
-    setMessages((prev) => [
-      ...prev,
-      { id: Date.now(), sender: "you", text: msg },
-    ]);
-
-    setMsg("");
+    const payload = { senderId: userId, text: msg, createdAt: Date.now() };
+    const res = await fetch(`http://localhost:8000/groups/${group.id}/messages`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      setMsg("");
+      loadMessages();
+    } else {
+      console.error("send failed", await res.text());
+    }
   }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, minimized]);
 
   if (!group) return null;
 
+  // floating bottom-right styling
+  const wrapperStyle = {
+    position: "fixed",
+    right: 20,
+    bottom: 20,
+    width: 360,
+    maxWidth: "calc(100vw - 40px)",
+    height: minimized ? 56 : 420,
+    background: "#0b0b0b",
+    color: "white",
+    borderRadius: 14,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+    zIndex: 99999,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  };
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 20,
-        right: 20,
-        width: 360,
-        height: 480,
-        zIndex: 99999,
-        background: "rgba(15,15,15,0.95)",
-        borderRadius: 16,
-        border: "1px solid rgba(255,255,255,0.12)",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        backdropFilter: "blur(16px)",
-      }}
-    >
-      {/* HEADER */}
-      <div
-        style={{
-          padding: "12px 14px",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          color: "white",
-          fontWeight: 700,
-        }}
-      >
-        <span>{group.name}</span>
-        <button
-          onClick={onMinimize}
-          style={{
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: 8,
-            padding: "4px 10px",
-            color: "white",
-            cursor: "pointer",
-          }}
-        >
-          ✕
-        </button>
+    <div style={wrapperStyle}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        <div style={{ fontWeight: 800 }}>{group.name}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setMinimized((s) => !s)} style={{ padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "white" }}>
+            {minimized ? "▴" : "▾"}
+          </button>
+          <button onClick={() => { onBack?.(); }} style={{ padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "white" }}>
+            ✕
+          </button>
+        </div>
       </div>
 
-      {/* MESSAGES */}
-      <div
-        style={{
-          flex: 1,
-          padding: 12,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-        }}
-      >
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              alignSelf: m.sender === "you" ? "flex-end" : "flex-start",
-              background:
-                m.sender === "you"
-                  ? "#10b981"
-                  : "rgba(255,255,255,0.1)",
-              color: m.sender === "you" ? "#000" : "#fff",
-              padding: "8px 12px",
-              borderRadius: 14,
-              maxWidth: "80%",
-              fontSize: 14,
-            }}
-          >
-            {m.text}
+      {!minimized && (
+        <>
+          <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+            {messages.map((m) => (
+              <div key={m.id} style={{ alignSelf: m.senderId === userId ? "flex-end" : "flex-start", maxWidth: "75%" }}>
+                <div style={{
+                  padding: "8px 12px",
+                  borderRadius: 18,
+                  background: m.senderId === userId ? "white" : "rgba(255,255,255,0.08)",
+                  color: m.senderId === userId ? "#111" : "white"
+                }}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
           </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* INPUT */}
-      <div
-        style={{
-          padding: 10,
-          display: "flex",
-          gap: 8,
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        <input
-          value={msg}
-          onChange={(e) => setMsg(e.target.value)}
-          placeholder="Message…"
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            borderRadius: 10,
-            background: "rgba(255,255,255,0.1)",
-            color: "white",
-            outline: "none",
-            border: "none",
-          }}
-        />
-        <button
-          onClick={sendMessage}
-          style={{
-            padding: "0 16px",
-            borderRadius: 10,
-            background: "#10b981",
-            fontWeight: 800,
-            color: "#000",
-          }}
-        >
-          Send
-        </button>
-      </div>
+          <div style={{ padding: 12, display: "flex", gap: 8 }}>
+            <input value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Type a message..." style={{ flex: 1, padding: 10, borderRadius: 12, border: "none", background: "rgba(255,255,255,0.03)", color: "white" }} />
+            <button onClick={sendMessage} style={{ padding: "8px 14px", borderRadius: 12, background: "#10b981", color: "#041014", fontWeight: 700 }}>Send</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

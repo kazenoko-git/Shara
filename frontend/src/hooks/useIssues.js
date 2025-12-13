@@ -1,33 +1,32 @@
-import { useEffect, useState } from "react";
+// frontend/src/hooks/useIssues.js
+import { useEffect, useState, useRef } from "react";
 
-export default function useIssues() {
+export default function useIssues(pollIntervalMs = 3000) {
   const [issues, setIssues] = useState([]);
+  const mounted = useRef(true);
 
   useEffect(() => {
-    let alive = true;
+    mounted.current = true;
 
-    const fetchIssues = async () => {
+    async function fetchIssues() {
       try {
         const res = await fetch("http://localhost:8000/issues");
-        if (!res.ok) throw new Error("Failed to fetch issues");
+        if (!res.ok) throw new Error("failed fetch issues");
         const data = await res.json();
-        if (alive) setIssues(data);
-      } catch (err) {
-        console.error("❌ Failed to load issues:", err);
+        if (mounted.current) setIssues(data);
+      } catch (e) {
+        console.warn("Failed to load issues:", e);
       }
-    };
+    }
 
-    // initial load
     fetchIssues();
-
-    // poll every 5s
-    const interval = setInterval(fetchIssues, 5000);
+    const id = setInterval(fetchIssues, pollIntervalMs);
 
     return () => {
-      alive = false;
-      clearInterval(interval);
+      mounted.current = false;
+      clearInterval(id);
     };
-  }, []);
+  }, [pollIntervalMs]);
 
   return issues;
 }
