@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+// src/components/GroupChat.jsx
+import React, { useEffect, useRef, useState } from "react";
 
-export default function GroupChat({ group, onBack }) {
+export default function GroupChat({ group, onMinimize }) {
   const [msg, setMsg] = useState("");
   const [messages, setMessages] = useState([
-    { id: 1, sender: "them", text: "Welcome to the group!" },
-    { id: 2, sender: "you", text: "Glad to help!" },
+    { id: 1, sender: "system", text: "Welcome to the group 👋" },
   ]);
 
   const bottomRef = useRef(null);
@@ -20,54 +20,67 @@ export default function GroupChat({ group, onBack }) {
     setMsg("");
   }
 
-  // scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  if (!group) return null;
+
   return (
     <div
       style={{
-        position: "absolute",
-        inset: 0,
-        background: "rgba(0,0,0,0.25)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        position: "fixed",
+        bottom: 20,
+        right: 20,
+        width: 360,
+        height: 480,
+        zIndex: 99999,
+        background: "rgba(15,15,15,0.95)",
+        borderRadius: 16,
+        border: "1px solid rgba(255,255,255,0.12)",
         display: "flex",
         flexDirection: "column",
-        padding: 20,
-        color: "white",
+        overflow: "hidden",
+        backdropFilter: "blur(16px)",
       }}
     >
-      {/* BACK BUTTON */}
-      <button
-        onClick={onBack}
+      {/* HEADER */}
+      <div
         style={{
-          padding: "8px 14px",
-          background: "rgba(255,255,255,0.15)",
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.2)",
-          marginBottom: 20,
-          width: "fit-content",
+          padding: "12px 14px",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          color: "white",
+          fontWeight: 700,
         }}
       >
-        ← Back
-      </button>
-
-      {/* GROUP NAME */}
-      <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>
-        {group.name}
+        <span>{group.name}</span>
+        <button
+          onClick={onMinimize}
+          style={{
+            background: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            borderRadius: 8,
+            padding: "4px 10px",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
       </div>
 
-      {/* CHAT MESSAGES */}
+      {/* MESSAGES */}
       <div
         style={{
           flex: 1,
+          padding: 12,
           overflowY: "auto",
-          paddingRight: 8,
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: 10,
         }}
       >
         {messages.map((m) => (
@@ -75,47 +88,54 @@ export default function GroupChat({ group, onBack }) {
             key={m.id}
             style={{
               alignSelf: m.sender === "you" ? "flex-end" : "flex-start",
-              maxWidth: "70%",
               background:
                 m.sender === "you"
-                  ? "rgba(255,255,255,0.95)"
-                  : "rgba(255,255,255,0.12)",
-              color: m.sender === "you" ? "#111" : "white",
-              padding: "10px 14px",
-              borderRadius: 16,
-              backdropFilter: "blur(10px)",
+                  ? "#10b981"
+                  : "rgba(255,255,255,0.1)",
+              color: m.sender === "you" ? "#000" : "#fff",
+              padding: "8px 12px",
+              borderRadius: 14,
+              maxWidth: "80%",
+              fontSize: 14,
             }}
           >
             {m.text}
           </div>
         ))}
-
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT BAR */}
+      {/* INPUT */}
       <div
         style={{
+          padding: 10,
           display: "flex",
-          gap: 10,
-          marginTop: 14,
+          gap: 8,
+          borderTop: "1px solid rgba(255,255,255,0.08)",
         }}
       >
         <input
-          className="flex-1 p-3 rounded-xl bg-white/10 text-white outline-none"
-          placeholder="Type a message..."
           value={msg}
           onChange={(e) => setMsg(e.target.value)}
+          placeholder="Message…"
+          style={{
+            flex: 1,
+            padding: "8px 12px",
+            borderRadius: 10,
+            background: "rgba(255,255,255,0.1)",
+            color: "white",
+            outline: "none",
+            border: "none",
+          }}
         />
-
         <button
           onClick={sendMessage}
           style={{
-            padding: "0 22px",
-            background: "white",
-            color: "#111",
-            borderRadius: 12,
-            fontWeight: 700,
+            padding: "0 16px",
+            borderRadius: 10,
+            background: "#10b981",
+            fontWeight: 800,
+            color: "#000",
           }}
         >
           Send

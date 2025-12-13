@@ -1,244 +1,145 @@
+// src/components/Groups.jsx
 import React, { useEffect, useState } from "react";
-import { db } from "../firebase";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-  doc,
-} from "firebase/firestore";
 
 export default function Groups({ issue, onBack, onOpenChat }) {
   const [groups, setGroups] = useState([]);
   const [newName, setNewName] = useState("");
   const userId = localStorage.getItem("userId");
 
+  const STORAGE_KEY = `groups_${issue.id}`;
+
+  // ---------------------------
+  // LOAD GROUPS (LOCAL)
+  // ---------------------------
   useEffect(() => {
-    if (!issue) return;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setGroups(JSON.parse(saved));
+    }
+  }, [STORAGE_KEY]);
 
-    const q = query(
-      collection(db, "groups"),
-      where("issueId", "==", issue.id)
-    );
+  // ---------------------------
+  // SAVE GROUPS
+  // ---------------------------
+  const persist = (list) => {
+    setGroups(list);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  };
 
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setGroups(list);
-    });
-
-    return () => unsub();
-  }, [issue]);
-
-  const createGroup = async () => {
+  // ---------------------------
+  // CREATE GROUP
+  // ---------------------------
+  const createGroup = () => {
     if (!newName.trim()) return;
 
-    await addDoc(collection(db, "groups"), {
-      issueId: issue.id,
+    const group = {
+      id: "grp_" + Date.now(),
       name: newName.trim(),
-      createdAt: Date.now(),
       members: [userId],
-    });
+      messages: [
+        { id: 1, sender: "system", text: "Welcome to the group 👋" },
+      ],
+    };
 
+    persist([...groups, group]);
     setNewName("");
   };
 
-  const joinGroup = async (groupId) => {
-    await updateDoc(doc(db, "groups", groupId), {
-      members: arrayUnion(userId),
-    });
+  // ---------------------------
+  // JOIN / LEAVE
+  // ---------------------------
+  const joinGroup = (id) => {
+    persist(
+      groups.map((g) =>
+        g.id === id && !g.members.includes(userId)
+          ? { ...g, members: [...g.members, userId] }
+          : g
+      )
+    );
   };
 
-  const leaveGroup = async (groupId) => {
-    await updateDoc(doc(db, "groups", groupId), {
-      members: arrayRemove(userId),
-    });
+  const leaveGroup = (id) => {
+    persist(
+      groups.map((g) =>
+        g.id === id
+          ? { ...g, members: g.members.filter((m) => m !== userId) }
+          : g
+      )
+    );
   };
 
-  const isMember = (g) => g.members?.includes(userId);
+  const isMember = (g) => g.members.includes(userId);
 
+  // ---------------------------
+  // UI
+  // ---------------------------
   return (
-    <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-2xl"
-      style={{ zIndex: 99999 }}
-    >
+    <div className="absolute inset-0 bg-black text-white z-50">
       {/* HEADER */}
-      <div
-        style={{
-          padding: "16px 20px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-white/10">
         <button
           onClick={onBack}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 12,
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            color: "white",
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
+          className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20"
         >
           ← Back
         </button>
-
-        <div style={{ color: "white", fontSize: 22, fontWeight: 800 }}>
-          Groups for Issue
-        </div>
+        <h1 className="text-2xl font-bold">Groups for Issue</h1>
       </div>
 
       {/* CONTENT */}
-      <div
-        style={{
-          padding: "0 20px 120px",
-          overflowY: "auto",
-          height: "calc(100% - 70px)",
-        }}
-      >
-        {/* CREATE GROUP */}
-        <div
-          style={{
-            background: "rgba(255,255,255,0.05)",
-            borderRadius: 18,
-            padding: 18,
-            marginBottom: 20,
-            border: "1px solid rgba(255,255,255,0.06)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-          }}
-        >
-          <div style={{ color: "white", fontWeight: 700, marginBottom: 8 }}>
-            Create a new group
-          </div>
-
+      <div className="p-6 max-w-xl">
+        {/* CREATE */}
+        <div className="mb-6">
+          <div className="text-lg font-semibold mb-2">Create a group</div>
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Group name..."
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.07)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "white",
-              marginBottom: 10,
-            }}
+            placeholder="Group name…"
+            className="w-full p-3 mb-3 rounded-lg bg-white/10"
           />
-
           <button
             onClick={createGroup}
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: 12,
-              background: "linear-gradient(90deg,#34d399,#10b981)",
-              border: "none",
-              color: "#041014",
-              fontWeight: 800,
-              cursor: "pointer",
-            }}
+            className="w-full py-3 rounded-lg bg-emerald-400 text-black font-bold"
           >
             Create Group
           </button>
         </div>
 
-        {/* GROUP LIST */}
-        <div style={{ color: "white", fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
-          Existing Groups
-        </div>
-
+        {/* LIST */}
         {groups.length === 0 && (
-          <div style={{ opacity: 0.6, color: "white" }}>
-            No groups yet. Create one!
-          </div>
+          <div className="opacity-60">No groups yet.</div>
         )}
 
         {groups.map((g) => (
           <div
             key={g.id}
-            style={{
-              background: "rgba(255,255,255,0.05)",
-              borderRadius: 18,
-              padding: 18,
-              marginBottom: 14,
-              border: "1px solid rgba(255,255,255,0.06)",
-              backdropFilter: "blur(16px)",
-              WebkitBackdropFilter: "blur(16px)",
-            }}
+            className="mb-4 p-4 rounded-xl bg-white/5 border border-white/10"
           >
-            {/* Group Header */}
-            <div
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: "white",
-                marginBottom: 6,
-              }}
-            >
-              {g.name}
+            <div className="text-lg font-bold">{g.name}</div>
+            <div className="opacity-70 mb-3">
+              {g.members.length} members
             </div>
 
-            <div style={{ color: "rgba(255,255,255,0.7)", marginBottom: 10 }}>
-              {g.members?.length || 0} members
-            </div>
-
-            {/* BUTTON ROW */}
-            <div style={{ display: "flex", gap: 10 }}>
+            <div className="flex gap-2">
               {!isMember(g) ? (
                 <button
                   onClick={() => joinGroup(g.id)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 14px",
-                    borderRadius: 12,
-                    border: "none",
-                    background: "white",
-                    color: "#041014",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
+                  className="flex-1 py-2 rounded-lg bg-white text-black font-bold"
                 >
                   Join
                 </button>
               ) : (
                 <button
                   onClick={() => leaveGroup(g.id)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 14px",
-                    borderRadius: 12,
-                    border: "none",
-                    background: "rgba(255,255,255,0.15)",
-                    color: "white",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
+                  className="flex-1 py-2 rounded-lg bg-white/20"
                 >
                   Leave
                 </button>
               )}
 
-              {/* CHAT BUTTON */}
               <button
                 onClick={() => onOpenChat(g)}
-                style={{
-                  flex: 1,
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  border: "none",
-                  background: "linear-gradient(90deg,#34d399,#10b981)",
-                  color: "#041014",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
+                className="flex-1 py-2 rounded-lg bg-emerald-400 text-black font-bold"
               >
                 Chat →
               </button>

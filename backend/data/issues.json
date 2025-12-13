@@ -1,0 +1,18 @@
+[
+  {
+    "id": "iss_c9e1e20a-873c-44f2-b1a2-d2f2901f03d1",
+    "title": "Dirt road",
+    "description": "",
+    "coords": [
+      77.65102061545315,
+      12.84072852796116
+    ],
+    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765633264/ojppv8g4bztzm0gkhf86.png",
+    "ai": {
+      "labels": [],
+      "confidence": 0.0,
+      "summary": "AI disabled: ULTRA_API_KEY not set."
+    },
+    "createdAt": 1765633265
+  }
+]

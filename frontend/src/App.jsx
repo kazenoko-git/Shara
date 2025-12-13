@@ -112,12 +112,13 @@ export default function App() {
       )}
 
       {/* 💬 CHAT PAGE */}
-      {page === "chat" && activeGroup && (
-        <GroupChat
-          group={activeGroup}
-          onBack={() => setPage("groups")}
-        />
-      )}
+      {activeGroup && (
+  <GroupChat
+    group={activeGroup}
+    onMinimize={() => setActiveGroup(null)}
+  />
+)}
+
     </div>
   );
 }

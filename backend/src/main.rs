@@ -1,133 +1,212 @@
 use axum::{
-    extract::State,
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
-use dotenvy::dotenv;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use std::{env, net::SocketAddr, sync::Arc};
-use tower_http::cors::{CorsLayer, Any};
-use axum::serve;
+use std::{fs, net::SocketAddr};
+use tower_http::cors::{Any, CorsLayer};
+use uuid::Uuid;
+use reqwest::Client;
 
+// =======================
+// DATA MODELS
+// =======================
+
+#[derive(Serialize, Deserialize, Clone)]
+struct AiResult {
+    labels: Vec<String>,
+    confidence: f32,
+    summary: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Issue {
+    id: String,
+    title: String,
+    description: String,
+    coords: [f64; 2],
+    imageUrl: Option<String>,
+    ai: Option<AiResult>,
+    createdAt: u64,
+}
+
+#[derive(Deserialize)]
+struct CreateIssue {
+    title: String,
+    description: String,
+    coords: [f64; 2],
+    imageUrl: Option<String>,
+    ai: Option<AiResult>,
+}
+
+// =======================
+// FILE STORAGE (JSON)
+// =======================
+
+fn load_issues() -> Vec<Issue> {
+    fs::create_dir_all("data").ok();
+    fs::read_to_string("data/issues.json")
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| vec![])
+}
+
+fn save_issues(issues: &Vec<Issue>) {
+    let _ = fs::write(
+        "data/issues.json",
+        serde_json::to_string_pretty(issues).unwrap(),
+    );
+}
+
+fn now_ts() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+// =======================
+// AI SUMMARY (NO LLM)
+// =======================
+
+fn build_summary(labels: &Vec<String>, confidence: f32) -> String {
+    if labels.is_empty() {
+        return "No visible damage detected.".to_string();
+    }
+
+    match labels[0].as_str() {
+        "pothole" => format!("Pothole detected ({:.0}% confidence).", confidence * 100.0),
+        "trash" => format!("Garbage accumulation detected ({:.0}% confidence).", confidence * 100.0),
+        "flooding" => format!("Water logging detected ({:.0}% confidence).", confidence * 100.0),
+        _ => format!("Infrastructure issue detected ({:.0}% confidence).", confidence * 100.0),
+    }
+}
+
+// =======================
+// API HANDLERS
+// =======================
+
+#[derive(Deserialize)]
+struct AnalyzeRequest {
+    image_url: String,
+}
+
+async fn analyze(Json(req): Json<AnalyzeRequest>) -> Json<AiResult> {
+    let api_key = match std::env::var("ULTRA_API_KEY") {
+        Ok(k) => k,
+        Err(_) => {
+            return Json(AiResult {
+                labels: vec![],
+                confidence: 0.0,
+                summary: "AI disabled: ULTRA_API_KEY not set.".to_string(),
+            });
+        }
+    };
+
+    let client = Client::new();
+
+    // download image
+    let image_bytes = client
+        .get(&req.image_url)
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap()
+        .to_vec(); // 🔥 FIX: Bytes → Vec<u8>
+
+    let response = client
+        .post("https://predict.ultralytics.com")
+        .header("x-api-key", api_key)
+        .multipart(
+            reqwest::multipart::Form::new()
+                .text("model", "https://hub.ultralytics.com/models/7j3uWTMc5oTCmiUkbzCx")
+                .text("imgsz", "640")
+                .text("conf", "0.25")
+                .part("file", reqwest::multipart::Part::bytes(image_bytes)),
+        )
+        .send()
+        .await
+        .unwrap()
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+
+    let preds = response["predictions"]
+        .as_array()
+        .cloned()
+        .unwrap_or_else(|| vec![]);
+
+    let mut labels: Vec<String> = vec![];
+    let mut max_conf: f32 = 0.0; // 🔥 FIX: explicit type
+
+    for p in preds {
+        if let Some(name) = p["name"].as_str() {
+            labels.push(name.to_string());
+        }
+        if let Some(c) = p["confidence"].as_f64() {
+            if c as f32 > max_conf {
+                max_conf = c as f32;
+            }
+        }
+    }
+
+    let summary = build_summary(&labels, max_conf);
+
+    Json(AiResult {
+        labels,
+        confidence: max_conf,
+        summary,
+    })
+}
+
+async fn create_issue(Json(input): Json<CreateIssue>) -> Json<Issue> {
+    let mut issues = load_issues();
+
+    let issue = Issue {
+        id: format!("iss_{}", Uuid::new_v4()),
+        title: input.title,
+        description: input.description,
+        coords: input.coords,
+        imageUrl: input.imageUrl,
+        ai: input.ai,
+        createdAt: now_ts(),
+    };
+
+    issues.push(issue.clone());
+    save_issues(&issues);
+
+    Json(issue)
+}
+
+async fn get_issues() -> Json<Vec<Issue>> {
+    Json(load_issues())
+}
+
+// =======================
+// MAIN
+// =======================
 
 #[tokio::main]
 async fn main() {
-    // Load .env
-    dotenv().ok();
-
-    // CORS for dev
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_headers(Any)
-        .allow_methods(Any);
+        .allow_methods(Any)
+        .allow_headers(Any);
 
-    // Firebase config
-    let api_key = env::var("FIREBASE_API_KEY")
-        .expect("missing FIREBASE_API_KEY");
-    let project_id = env::var("FIREBASE_PROJECT_ID")
-        .expect("missing FIREBASE_PROJECT_ID");
-
-    // Router
     let app = Router::new()
-        .route("/scan-area", post(scan_area))
-        .with_state(firestore)
+        .route("/analyze", post(analyze))
+        .route("/issues", get(get_issues).post(create_issue))
         .layer(cors);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    println!("🚀 Rust API running at http://localhost:3000");
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    println!("🚀 Backend running on http://localhost:8000");
 
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .expect("Failed to bind");
-
-    serve(listener, app)
-        .await
-        .expect("Server failed");
-}
-
-// ---------------------------------------------
-// Request + Response structs
-// ---------------------------------------------
-#[derive(Deserialize)]
-struct ScanAreaRequest {
-    bbox: [f64; 4],
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PolygonFeature {
-    r#type: String,
-    geometry: serde_json::Value,
-    properties: serde_json::Value,
-}
-
-#[derive(Serialize)]
-struct ScanAreaResponse {
-    status: &'static str,
-    polygons: Vec<PolygonFeature>,
-}
-
-// ---------------------------------------------
-// Handler
-// ---------------------------------------------
-async fn scan_area(
-    State(firestore): State<Arc<Firestore>>,
-    Json(payload): Json<ScanAreaRequest>,
-) -> Json<ScanAreaResponse> {
-    
-    println!("📥 Rust received bbox: {:?}", payload.bbox);
-
-    // ---------------------------------------------------
-    // 1. CALL PYTHON BACKEND
-    // ---------------------------------------------------
-    let client = Client::new();
-
-    let python_res = client
-        .post("http://localhost:8000/predict")
-        .json(&payload)
-        .send()
-        .await;
-
-    if python_res.is_err() {
-        println!("❌ Python backend unreachable");
-        return Json(ScanAreaResponse {
-            status: "python_error",
-            polygons: vec![],
-        });
-    }
-
-    let python_json = python_res.unwrap().json::<Vec<PolygonFeature>>().await;
-
-    if python_json.is_err() {
-        println!("❌ Python returned invalid JSON");
-        return Json(ScanAreaResponse {
-            status: "invalid_python_json",
-            polygons: vec![],
-        });
-    }
-
-    let polygons = python_json.unwrap();
-    println!("🟢 Received {} polygons from Python", polygons.len());
-
-    // ---------------------------------------------------
-    // 2. SAVE TO FIRESTORE
-    // ---------------------------------------------------
-    for poly in &polygons {
-        let issue_doc = json!({
-            "type":         { "stringValue": poly.properties["category"].as_str().unwrap_or("") },
-            "geometry":     { "stringValue": poly.geometry.to_string() },
-            "created":      { "timestampValue": chrono::Utc::now().to_rfc3339() },
-        });
-
-        firestore.save_issue(issue_doc).await;
-    }
-
-    // ---------------------------------------------------
-    // 3. RETURN TO FRONTEND
-    // ---------------------------------------------------
-    Json(ScanAreaResponse {
-        status: "ok",
-        polygons,
-    })
+    axum::serve(
+        tokio::net::TcpListener::bind(addr).await.unwrap(),
+        app,
+    )
+    .await
+    .unwrap();
 }
