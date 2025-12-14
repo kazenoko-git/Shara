@@ -21,7 +21,7 @@ export default function MainMap({
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json",
+      style: "https://demotiles.maplibre.org/style.json",
       center: [77.216721, 28.6448],
       zoom: 12,
       attributionControl: false,
