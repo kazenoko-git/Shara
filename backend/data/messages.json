@@ -5,5 +5,12 @@
     "senderId": "u_j8pf172zig",
     "text": "Hello",
     "createdAt": 1765642099
+  },
+  {
+    "id": "msg_141ecee4-9a07-4b01-849c-7a90e2a040aa",
+    "groupId": "grp_e75823dd-6d60-4a6f-bd83-21fee12b3d08",
+    "senderId": "u_j8pf172zig",
+    "text": "Hallo",
+    "createdAt": 1765680160
   }
 ]

@@ -1,3 +1,4 @@
+// src/components/Groups.jsx
 import React, { useEffect, useState } from "react";
 
 export default function Groups({ issue, onBack, onOpenChat }) {
@@ -20,7 +21,7 @@ export default function Groups({ issue, onBack, onOpenChat }) {
   }, [issue]);
 
   // ---------------------------
-  // CREATE GROUP (🔥 FIXED)
+  // CREATE GROUP
   // ---------------------------
   async function createGroup() {
     if (!name.trim()) return;
@@ -33,20 +34,17 @@ export default function Groups({ issue, onBack, onOpenChat }) {
         body: JSON.stringify({
           issueId: issue.id,
           name: name.trim(),
-          userId,               // ✅ REQUIRED
+          userId,
         }),
       });
 
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t);
-      }
+      if (!res.ok) throw new Error("Create failed");
 
       const group = await res.json();
       setGroups((g) => [...g, group]);
       setName("");
     } catch (e) {
-      console.error("Create group failed:", e);
+      console.error(e);
       alert("Failed to create group");
     } finally {
       setLoading(false);
@@ -99,63 +97,168 @@ export default function Groups({ issue, onBack, onOpenChat }) {
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,0.45)",
-          backdropFilter: "blur(10px)",
+          background: "rgba(0,0,0,0.55)",
+          backdropFilter: "blur(14px)",
           zIndex: 99998,
         }}
       />
 
-      {/* DIALOG */}
+      {/* MODAL */}
       <div
         style={{
           position: "fixed",
           left: "50%",
           top: "50%",
           transform: "translate(-50%, -50%)",
-          width: 520,
+          width: 560,
           maxWidth: "92vw",
-          background: "rgba(15,15,15,0.9)",
-          borderRadius: 20,
-          padding: 20,
+          background: "rgba(12,12,12,0.9)",
+          borderRadius: 22,
+          padding: 22,
           zIndex: 99999,
           color: "white",
-          boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
+          boxShadow: "0 40px 120px rgba(0,0,0,0.7)",
         }}
       >
-        <button onClick={onBack} style={{ marginBottom: 12 }}>
-          ← Back
-        </button>
+        {/* HEADER */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={onBack}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.06)",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            ← Back
+          </button>
 
-        <h2>Groups</h2>
-        <p style={{ opacity: 0.7 }}>for “{issue.title}”</p>
+          <div>
+            <h2 style={{ margin: 0 }}>Groups</h2>
+            <div style={{ fontSize: 13, opacity: 0.65 }}>
+              for “{issue.title}”
+            </div>
+          </div>
+        </div>
 
-        <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+        {/* CREATE GROUP */}
+        <div
+          style={{
+            marginTop: 18,
+            display: "flex",
+            gap: 10,
+          }}
+        >
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Group name"
-            style={{ flex: 1 }}
+            placeholder="New group name"
+            style={{
+              flex: 1,
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "white",
+              outline: "none",
+            }}
           />
-          <button onClick={createGroup} disabled={loading}>
+          <button
+            onClick={createGroup}
+            disabled={loading}
+            style={{
+              padding: "12px 16px",
+              borderRadius: 12,
+              background: "linear-gradient(90deg,#34d399,#10b981)",
+              color: "#041014",
+              fontWeight: 800,
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
             Create
           </button>
         </div>
 
-        <div style={{ marginTop: 20 }}>
+        {/* GROUP LIST */}
+        <div style={{ marginTop: 22 }}>
           {groups.length === 0 && (
-            <div style={{ opacity: 0.6 }}>No groups yet</div>
+            <div style={{ opacity: 0.6, textAlign: "center", padding: 20 }}>
+              No groups yet — be the first 👀
+            </div>
           )}
 
           {groups.map((g) => (
-            <div key={g.id} style={{ marginTop: 12 }}>
-              <b>{g.name}</b> — {g.members.length} members
-              <div style={{ marginTop: 6 }}>
+            <div
+              key={g.id}
+              style={{
+                padding: 14,
+                borderRadius: 14,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontWeight: 700 }}>{g.name}</div>
+              <div style={{ fontSize: 13, opacity: 0.65 }}>
+                {g.members.length} members
+              </div>
+
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  gap: 8,
+                }}
+              >
                 {!isMember(g) ? (
-                  <button onClick={() => joinGroup(g.id)}>Join</button>
+                  <button
+                    onClick={() => joinGroup(g.id)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      background: "rgba(255,255,255,0.1)",
+                      color: "white",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Join
+                  </button>
                 ) : (
-                  <button onClick={() => leaveGroup(g.id)}>Leave</button>
+                  <button
+                    onClick={() => leaveGroup(g.id)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      background: "rgba(239,68,68,0.2)",
+                      color: "#fecaca",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Leave
+                  </button>
                 )}
-                <button onClick={() => onOpenChat(g)}>Chat →</button>
+
+                <button
+                  onClick={() => onOpenChat(g)}
+                  style={{
+                    marginLeft: "auto",
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    background: "rgba(255,255,255,0.12)",
+                    color: "white",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  Open Chat →
+                </button>
               </div>
             </div>
           ))}
