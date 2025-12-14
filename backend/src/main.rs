@@ -224,14 +224,11 @@ async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
     };
 
     let img_bytes = match reqwest::get(&req.image_url).await {
-        Ok(r) => r.bytes().await.unwrap(),
-        Err(_) => {
-            return Json(AiResult {
-                boxes: vec![],
-                avg_confidence: 0.0,
-                severity: 0,
-            });
-        }
+        Ok(r) => match r.bytes().await {
+            Ok(b) => b,
+            Err(_) => return Json(AiResult { boxes: vec![], avg_confidence: 0.0, severity: 0 }),
+        },
+        Err(_) => return Json(AiResult { boxes: vec![], avg_confidence: 0.0, severity: 0 }),
     };
 
     let form = multipart::Form::new()
@@ -247,24 +244,27 @@ async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
                 .unwrap(),
         );
 
-    let resp = reqwest::Client::new()
+    let resp = match reqwest::Client::new()
         .post("https://predict.ultralytics.com")
         .header("x-api-key", api_key)
         .multipart(form)
         .send()
         .await
-        .unwrap();
+    {
+        Ok(r) => r,
+        Err(_) => return Json(AiResult { boxes: vec![], avg_confidence: 0.0, severity: 0 }),
+    };
 
     let json: Value = resp.json().await.unwrap_or_default();
 
-    let mut boxes = vec![];
+    let mut raw_boxes = vec![];
 
     if let Some(images) = json["images"].as_array() {
         for img in images {
             if let Some(results) = img["results"].as_array() {
                 for r in results {
                     let b = &r["box"];
-                    boxes.push(BBox {
+                    raw_boxes.push(BBox {
                         x1: b["x1"].as_f64().unwrap_or(0.0) as f32,
                         y1: b["y1"].as_f64().unwrap_or(0.0) as f32,
                         x2: b["x2"].as_f64().unwrap_or(0.0) as f32,
@@ -277,23 +277,22 @@ async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
         }
     }
 
-    let boxes = merge_boxes(boxes);
+    let boxes = merge_boxes(raw_boxes);
+    let count = boxes.len();
 
-let count = boxes.len();
-let avg = if count == 0 {
-    0.0
-} else {
-    boxes.iter().map(|b| b.confidence).sum::<f32>() / count as f32
-};
+    let avg = if count == 0 {
+        0.0
+    } else {
+        boxes.iter().map(|b| b.confidence).sum::<f32>() / count as f32
+    };
 
-let severity = count.min(5) as u8;
+    let severity = count.min(5) as u8;
 
-Json(AiResult {
-    boxes,
-    avg_confidence: avg,
-    severity,
-})
-
+    Json(AiResult {
+        boxes,
+        avg_confidence: avg,
+        severity,
+    })
 }
 
 // ============================
@@ -324,13 +323,7 @@ async fn get_issues() -> Json<Vec<Issue>> {
 
 async fn create_issue(Json(input): Json<NewIssue>) -> (StatusCode, Json<Issue>) {
     let ai = if let Some(ref url) = input.imageUrl {
-        Some(
-            analyze(Json(AnalyzeReq {
-                image_url: url.clone(),
-            }))
-            .await
-            .0,
-        )
+        Some(analyze(Json(AnalyzeReq { image_url: url.clone() })).await.0)
     } else {
         None
     };
@@ -368,7 +361,7 @@ async fn delete_issue(Path(id): Path<String>) -> StatusCode {
 }
 
 // ============================
-// GROUPS
+// GROUPS + CHAT + SSE
 // ============================
 
 async fn get_groups(Query(q): Query<HashMap<String, String>>) -> Json<Vec<Group>> {
@@ -417,10 +410,6 @@ async fn leave_group(Path(id): Path<String>, Json(req): Json<MemberReq>) -> Stat
     save_json("data/groups.json", &groups);
     StatusCode::OK
 }
-
-// ============================
-// MESSAGES + SSE
-// ============================
 
 async fn get_messages(Path(id): Path<String>) -> Json<Vec<Message>> {
     let msgs: Vec<Message> = load_json("data/messages.json");
@@ -481,6 +470,11 @@ async fn main() {
     let (tx, _) = broadcast::channel::<Message>(100);
     let state = AppState { msg_tx: tx };
 
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "8000".to_string())
+        .parse::<u16>()
+        .unwrap();
+
     let app = Router::new()
         .route("/users", post(create_user))
         .route("/analyze", post(analyze))
@@ -499,8 +493,8 @@ async fn main() {
                 .allow_headers(Any),
         );
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
-    println!("🚀 Backend running on http://localhost:8000");
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    println!("🚀 Backend running on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
