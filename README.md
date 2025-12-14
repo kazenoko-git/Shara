@@ -69,17 +69,6 @@ This makes it suitable for civic tech, sustainability projects, and community re
 
 ---
 
-## 📂 Project Structure
-Shara/
-├── frontend/ # React app
-├── backend/ # Axum API server
-├── data/ # JSON issue storage
-├── messages.db # SQLite chat database
-└── README.md
-
-
----
-
 ## 🚀 Running Locally
 
 ### Frontend
