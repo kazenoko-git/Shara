@@ -1,84 +1,166 @@
-// frontend/src/components/Groups.jsx
 import React, { useEffect, useState } from "react";
 
 export default function Groups({ issue, onBack, onOpenChat }) {
   const [groups, setGroups] = useState([]);
-  const [newName, setNewName] = useState("");
-  const userId = localStorage.getItem("userId") || "u_anonymous";
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  const userId = localStorage.getItem("userId");
+
+  // ---------------------------
+  // LOAD GROUPS
+  // ---------------------------
   useEffect(() => {
-    if (!issue) return;
-    load();
+    if (!issue?.id) return;
+
+    fetch(`http://localhost:8000/groups?issueId=${issue.id}`)
+      .then((r) => r.json())
+      .then(setGroups)
+      .catch(console.error);
   }, [issue]);
 
-  async function load() {
-    try {
-      const res = await fetch(`http://localhost:8000/groups?issueId=${encodeURIComponent(issue.id)}`);
-      if (!res.ok) throw new Error("groups failed");
-      const data = await res.json();
-      setGroups(data);
-    } catch (e) {
-      console.error("Failed to load groups", e);
-    }
-  }
-
+  // ---------------------------
+  // CREATE GROUP (🔥 FIXED)
+  // ---------------------------
   async function createGroup() {
-    if (!newName.trim()) return;
-    const payload = { issueId: issue.id, name: newName.trim(), members: [userId], createdAt: Date.now() };
-    const res = await fetch("http://localhost:8000/groups", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    if (!res.ok) {
-      console.error("create group failed", await res.text());
-      return;
+    if (!name.trim()) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:8000/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issueId: issue.id,
+          name: name.trim(),
+          userId,               // ✅ REQUIRED
+        }),
+      });
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t);
+      }
+
+      const group = await res.json();
+      setGroups((g) => [...g, group]);
+      setName("");
+    } catch (e) {
+      console.error("Create group failed:", e);
+      alert("Failed to create group");
+    } finally {
+      setLoading(false);
     }
-    const g = await res.json();
-    setGroups((prev) => [...prev, g]);
-    setNewName("");
   }
 
+  // ---------------------------
+  // JOIN / LEAVE
+  // ---------------------------
   async function joinGroup(id) {
-    await fetch(`http://localhost:8000/groups/${id}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
-    setGroups((prev) => prev.map(g => g.id === id ? { ...g, members: Array.from(new Set([...(g.members||[]), userId])) } : g));
+    await fetch(`http://localhost:8000/groups/${id}/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    setGroups((gs) =>
+      gs.map((g) =>
+        g.id === id ? { ...g, members: [...g.members, userId] } : g
+      )
+    );
   }
 
   async function leaveGroup(id) {
-    await fetch(`http://localhost:8000/groups/${id}/leave`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
-    setGroups((prev) => prev.map(g => g.id === id ? { ...g, members: (g.members||[]).filter(m => m !== userId) } : g));
+    await fetch(`http://localhost:8000/groups/${id}/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    setGroups((gs) =>
+      gs.map((g) =>
+        g.id === id
+          ? { ...g, members: g.members.filter((m) => m !== userId) }
+          : g
+      )
+    );
   }
 
-  const isMember = (g) => (g.members || []).includes(userId);
+  const isMember = (g) => g.members.includes(userId);
 
+  // ---------------------------
+  // UI
+  // ---------------------------
   return (
-    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", color: "white", zIndex: 99999 }}>
-      <div style={{ padding: 16 }}>
-        <button onClick={onBack} style={{ padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.06)", color: "white" }}>← Back</button>
-        <h1 style={{ marginTop: 8 }}>Groups for Issue</h1>
+    <>
+      {/* BACKDROP */}
+      <div
+        onClick={onBack}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.45)",
+          backdropFilter: "blur(10px)",
+          zIndex: 99998,
+        }}
+      />
 
-        <div style={{ marginTop: 16, maxWidth: 640 }}>
-          <div style={{ marginBottom: 8, fontWeight: 700 }}>Create a group</div>
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Group name..." style={{ width: "100%", padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.04)", color: "white", border: "1px solid rgba(255,255,255,0.06)" }} />
-          <button onClick={createGroup} style={{ marginTop: 8, padding: "12px 16px", borderRadius: 10, background: "#10b981", color: "#041014", fontWeight: 700 }}>Create Group</button>
+      {/* DIALOG */}
+      <div
+        style={{
+          position: "fixed",
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 520,
+          maxWidth: "92vw",
+          background: "rgba(15,15,15,0.9)",
+          borderRadius: 20,
+          padding: 20,
+          zIndex: 99999,
+          color: "white",
+          boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
+        }}
+      >
+        <button onClick={onBack} style={{ marginBottom: 12 }}>
+          ← Back
+        </button>
+
+        <h2>Groups</h2>
+        <p style={{ opacity: 0.7 }}>for “{issue.title}”</p>
+
+        <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Group name"
+            style={{ flex: 1 }}
+          />
+          <button onClick={createGroup} disabled={loading}>
+            Create
+          </button>
         </div>
 
-        <div style={{ marginTop: 24, maxWidth: 640 }}>
-          {groups.length === 0 && <div>No groups yet.</div>}
+        <div style={{ marginTop: 20 }}>
+          {groups.length === 0 && (
+            <div style={{ opacity: 0.6 }}>No groups yet</div>
+          )}
 
           {groups.map((g) => (
-            <div key={g.id} style={{ marginTop: 12, padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 10 }}>
-              <div style={{ fontWeight: 800 }}>{g.name}</div>
-              <div style={{ color: "rgba(255,255,255,0.7)" }}>{(g.members||[]).length} members</div>
-              <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+            <div key={g.id} style={{ marginTop: 12 }}>
+              <b>{g.name}</b> — {g.members.length} members
+              <div style={{ marginTop: 6 }}>
                 {!isMember(g) ? (
-                  <button onClick={() => joinGroup(g.id)} style={{ padding: "10px 12px", borderRadius: 8, background: "white", color: "#111", fontWeight: 700 }}>Join</button>
+                  <button onClick={() => joinGroup(g.id)}>Join</button>
                 ) : (
-                  <button onClick={() => leaveGroup(g.id)} style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.08)", color: "white", fontWeight: 700 }}>Leave</button>
+                  <button onClick={() => leaveGroup(g.id)}>Leave</button>
                 )}
-
-                <button onClick={() => onOpenChat(g)} style={{ padding: "10px 12px", borderRadius: 8, background: "#10b981", color: "#041014", fontWeight: 800 }}>Chat →</button>
+                <button onClick={() => onOpenChat(g)}>Chat →</button>
               </div>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

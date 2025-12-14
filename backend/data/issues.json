@@ -1,18 +1,101 @@
 [
   {
-    "id": "iss_c9e1e20a-873c-44f2-b1a2-d2f2901f03d1",
-    "title": "Dirt road",
+    "id": "iss_728c3b7e-16c5-43fe-b092-b4ec3486ca2e",
+    "title": "Test",
     "description": "",
     "coords": [
-      77.65102061545315,
-      12.84072852796116
+      77.22470325402782,
+      28.649620736216676
     ],
-    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765633264/ojppv8g4bztzm0gkhf86.png",
+    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765653526/mbeeguimlihsdaa9aind.png",
+    "category": "unverified",
     "ai": {
-      "labels": [],
-      "confidence": 0.0,
-      "summary": "AI disabled: ULTRA_API_KEY not set."
+      "boxes": [],
+      "avg_confidence": 0.0,
+      "severity": 0
     },
-    "createdAt": 1765633265
+    "reports": 1,
+    "createdAt": 1765653535
+  },
+  {
+    "id": "iss_6c69186b-7fe1-488d-ac3d-9bc3fa6b73e2",
+    "title": "Test2",
+    "description": "",
+    "coords": [
+      77.2118286507573,
+      28.657152692933792
+    ],
+    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765653620/ihbzatu7xnvuvm189sas.png",
+    "category": "unverified",
+    "ai": {
+      "boxes": [],
+      "avg_confidence": 0.0,
+      "severity": 0
+    },
+    "reports": 1,
+    "createdAt": 1765653627
+  },
+  {
+    "id": "iss_5b5819ab-f0dc-494d-895d-3d71e2126cb1",
+    "title": "Test3",
+    "description": "",
+    "coords": [
+      77.23534625939874,
+      28.663780367266146
+    ],
+    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765653729/skugp9xpdrefsttowbfi.png",
+    "category": "unverified",
+    "ai": {
+      "boxes": [],
+      "avg_confidence": 0.0,
+      "severity": 0
+    },
+    "reports": 1,
+    "createdAt": 1765653735
+  },
+  {
+    "id": "iss_4c3ebfe8-2142-4092-bfa0-408b3f8285db",
+    "title": "Test0",
+    "description": "",
+    "coords": [
+      77.23156970910583,
+      28.647210395805914
+    ],
+    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765655362/ovcbx08h0nvjsmjwzdhs.png",
+    "category": "unverified",
+    "ai": {
+      "boxes": [],
+      "avg_confidence": 0.0,
+      "severity": 0
+    },
+    "reports": 1,
+    "createdAt": 1765655373
+  },
+  {
+    "id": "iss_af1de275-2490-4a19-ae51-ed8c15dbc709",
+    "title": "Test24",
+    "description": "",
+    "coords": [
+      77.20032733850081,
+      28.66182223437363
+    ],
+    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765655396/mimvtsib5u7wab6ppn0a.png",
+    "category": "unverified",
+    "ai": {
+      "boxes": [
+        {
+          "x1": 512.67267,
+          "y1": 447.39734,
+          "x2": 1107.9188,
+          "y2": 658.3541,
+          "confidence": 0.42786,
+          "label": "repaired_cracks"
+        }
+      ],
+      "avg_confidence": 0.42786,
+      "severity": 1
+    },
+    "reports": 1,
+    "createdAt": 1765655405
   }
 ]
