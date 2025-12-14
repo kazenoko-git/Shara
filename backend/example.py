@@ -3,12 +3,11 @@ import requests
 import os
 
 # NOTE: REQUIRES AN 'images' FOLDER AND 'output' FOLDER IN SAME DIRECTORY
-# WILL MAKE API CALLS TO RUN INFERENCE ON EACH IMG IN images AND SAVE JSON TO OUTPUT
 
 # Run inference on an image
 url = "https://predict.ultralytics.com"
 headers = {"x-api-key": "..."} # IVAN API KEY GOES HERE 
-data = {"model": "https://hub.ultralytics.com/models/7j3uWTMc5oTCmiUkbzCx", "imgsz": 640, "conf": 0.25, "iou": 0.45}
+data = {"model": "https://hub.ultralytics.com/models/nNbNzUo22v46beB7tHyQ", "imgsz": 640, "conf": 0.20, "iou": 0.45}
 
 images = os.listdir("images/")
 for image in images:
