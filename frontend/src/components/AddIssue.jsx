@@ -8,6 +8,8 @@ export default function AddIssue({ onBack, onSaved }) {
   const mapEl = useRef(null);
   const map = useRef(null);
   const marker = useRef(null);
+  const fileInputRef = useRef(null);
+
 
   const [coords, setCoords] = useState(null);
   const [title, setTitle] = useState("");
@@ -15,7 +17,6 @@ export default function AddIssue({ onBack, onSaved }) {
   const [imageFile, setImageFile] = useState(null);
 
   const [saving, setSaving] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
@@ -53,20 +54,13 @@ export default function AddIssue({ onBack, onSaved }) {
   const runAI = async (imageUrl) => {
     setAiLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/analyze", {
+      await fetch("http://localhost:8000/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image_url: imageUrl }),
       });
-
-      if (!res.ok) throw new Error("AI failed");
-      const data = await res.json();
-      setAiResult(data);
-      return data;
     } catch (e) {
-      console.warn("AI error", e);
-      setAiResult({ summary: "AI error or disabled.", confidence: 0, labels: [] });
-      return { summary: "AI error or disabled.", confidence: 0, labels: [] };
+      console.warn("AI failed silently", e);
     } finally {
       setAiLoading(false);
     }
@@ -75,19 +69,20 @@ export default function AddIssue({ onBack, onSaved }) {
   const handleSubmit = async () => {
     if (!coords) return alert("Place a pin first");
     if (!imageFile) return alert("Upload an image");
+
     setSaving(true);
 
     try {
       const imageUrl = await uploadToCloudinary(imageFile);
 
-      const ai = await runAI(imageUrl);
+      // 🔇 Silent AI run
+      runAI(imageUrl);
 
       const payload = {
         title: title || "Untitled",
         description: desc || "",
         coords,
         imageUrl,
-        ai,
         createdAt: Date.now(),
       };
 
@@ -106,7 +101,7 @@ export default function AddIssue({ onBack, onSaved }) {
       onSaved?.(saved);
     } catch (err) {
       console.error("Save failed", err);
-      alert("Save failed: " + (err.message || err));
+      alert("Save failed");
     } finally {
       setSaving(false);
     }
@@ -118,49 +113,137 @@ export default function AddIssue({ onBack, onSaved }) {
 
       <button
         onClick={onBack}
-        style={{ position: "absolute", top: 20, left: 20, zIndex: 30, padding: "10px 16px", borderRadius: 12, background: "rgba(0,0,0,0.45)", color: "#fff", border: "none", }}
+        style={{
+          position: "absolute",
+          top: 20,
+          left: 20,
+          zIndex: 30,
+          padding: "10px 16px",
+          borderRadius: 12,
+          background: "rgba(0,0,0,0.45)",
+          color: "#fff",
+          border: "none",
+          cursor: "pointer",
+        }}
       >
         ← Back
       </button>
 
-      <div style={{
-        position: "absolute",
-        left: "50%",
-        bottom: 36,
-        transform: "translateX(-50%)",
-        width: 760,
-        maxWidth: "92vw",
-        borderRadius: 16,
-        padding: 20,
-        background: "rgba(12,12,12,0.85)",
-        backdropFilter: "blur(14px)",
-        color: "white",
-        zIndex: 40
-      }}>
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          bottom: 36,
+          transform: "translateX(-50%)",
+          width: 760,
+          maxWidth: "92vw",
+          borderRadius: 18,
+          padding: 20,
+          background: "rgba(12,12,12,0.85)",
+          backdropFilter: "blur(14px)",
+          color: "white",
+          zIndex: 40,
+          boxSizing: "border-box",
+        }}
+      >
         <h3 style={{ margin: 0, fontSize: 20 }}>Add Issue</h3>
 
-        <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%", marginTop: 10, padding: 10 }} />
-        <textarea placeholder="Description" rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} style={{ width: "100%", marginTop: 8, padding: 10 }} />
+        <input
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          style={inputStyle}
+        />
 
-        <div style={{ marginTop: 8 }}>
-          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0])} />
-        </div>
+        <textarea
+          placeholder="Description"
+          rows={3}
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          style={{ ...inputStyle, resize: "none" }}
+        />
 
-        {aiLoading && <p>🔍 Running AI…</p>}
+        <div style={{ marginTop: 12 }}>
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept="image/*"
+    style={{ display: "none" }}
+    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+  />
 
-        {aiResult && (
-          <div style={{ marginTop: 10, fontSize: 14 }}>
-            <b>AI Result:</b><br />
-            {aiResult.summary}<br />
-            Confidence: {(aiResult.confidence * 100).toFixed(1)}%
-          </div>
-        )}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+    }}
+  >
+    <button
+      type="button"
+      onClick={() => fileInputRef.current?.click()}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 10,
+        background: "rgba(255,255,255,0.08)",
+        color: "white",
+        border: "1px solid rgba(255,255,255,0.15)",
+        cursor: "pointer",
+        fontSize: 14,
+      }}
+    >
+      Upload image
+    </button>
 
-        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-          <button onClick={handleSubmit} disabled={saving} style={{ flex: 1, padding: "12px 14px", borderRadius: 10, background: "#10b981", color: "#041014", fontWeight: 700 }}>
+    <span
+      style={{
+        fontSize: 13,
+        opacity: 0.75,
+        maxWidth: 360,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >
+      {imageFile ? imageFile.name : "No image selected"}
+    </span>
+  </div>
+</div>
+
+
+        <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            style={{
+              flex: 1,
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "#10b981",
+              color: "#041014",
+              fontWeight: 700,
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
             {saving ? "Submitting…" : "Submit Issue"}
           </button>
-          <button onClick={() => { setTitle(""); setDesc(""); setImageFile(null); setAiResult(null); }} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.06)", color: "white" }}>
+
+          <button
+            onClick={() => {
+              setTitle("");
+              setDesc("");
+              setImageFile(null);
+            }}
+            style={{
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.06)",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
             Clear
           </button>
         </div>
@@ -168,3 +251,16 @@ export default function AddIssue({ onBack, onSaved }) {
     </div>
   );
 }
+
+const inputStyle = {
+  width: "100%",
+  marginTop: 10,
+  padding: "12px 14px",
+  borderRadius: 12,
+  background: "rgba(255,255,255,0.06)",
+  color: "white",
+  border: "1px solid rgba(255,255,255,0.12)",
+  outline: "none",
+  boxSizing: "border-box",
+  fontSize: 14,
+};
