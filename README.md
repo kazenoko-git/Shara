@@ -94,3 +94,12 @@ npm run dev
 cd backend
 cargo run
 ```
+
+## 🧪 Demo Notes
+
+- Test data can be purged using admin endpoints
+- AI analysis is optional and non-blocking
+- Designed for rapid demos and hackathons
+
+## 🔒 Disclaimer
+Shara is a prototype / demo project built for rapid experimentation and demonstration purposes.
