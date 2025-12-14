@@ -12,5 +12,12 @@
     "senderId": "u_j8pf172zig",
     "text": "Hallo",
     "createdAt": 1765680160
+  },
+  {
+    "id": "msg_c37dc90f-c993-424e-8e57-73b367502b78",
+    "groupId": "grp_7f47a708-61d5-4954-882b-405c1abd0e70",
+    "senderId": "u_j8pf172zig",
+    "text": "Hallo",
+    "createdAt": 1765684235
   }
 ]

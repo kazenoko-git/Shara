@@ -10,10 +10,11 @@ export default function MainMap({
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const mapLoadedRef = useRef(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   // =========================
-  // INIT MAP (ONCE)
+  // INIT MAP (STRICTMODE SAFE)
   // =========================
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -32,68 +33,77 @@ export default function MainMap({
     );
 
     map.on("load", () => {
-      map.addSource("shara-issues", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [],
-        },
-      });
+      mapLoadedRef.current = true;
 
-      map.addLayer({
-        id: "shara-circles",
-        type: "circle",
-        source: "shara-issues",
-        paint: {
-          "circle-color": "#E5E7EB",
-          "circle-radius": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            10, 6,
-            14, 10,
-            17, 16,
-          ],
-          "circle-stroke-width": 1.5,
-          "circle-stroke-color": "rgba(0,0,0,0.4)",
-        },
-      });
-
-      map.on("click", "shara-circles", (e) => {
-        const f = e.features?.[0];
-        if (!f) return;
-
-        onSelectIssue?.({
-          id: f.properties.id,
-          title: f.properties.title,
-          description: f.properties.description,
-          imageUrl: f.properties.imageUrl,
-          coords: f.geometry.coordinates,
-          ai: f.properties.ai
-            ? JSON.parse(f.properties.ai)
-            : null,
+      if (!map.getSource("shara-issues")) {
+        map.addSource("shara-issues", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
         });
-      });
+      }
 
-      map.on("mouseenter", "shara-circles", () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
+      if (!map.getLayer("shara-circles")) {
+        map.addLayer({
+          id: "shara-circles",
+          type: "circle",
+          source: "shara-issues",
+          paint: {
+            "circle-color": "#E5E7EB",
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10, 6,
+              14, 10,
+              17, 16,
+            ],
+            "circle-stroke-width": 1.5,
+            "circle-stroke-color": "rgba(0,0,0,0.4)",
+          },
+        });
 
-      map.on("mouseleave", "shara-circles", () => {
-        map.getCanvas().style.cursor = "";
-      });
+        map.on("click", "shara-circles", (e) => {
+          const f = e.features?.[0];
+          if (!f) return;
+
+          onSelectIssue?.({
+            id: f.properties.id,
+            title: f.properties.title,
+            description: f.properties.description,
+            imageUrl: f.properties.imageUrl,
+            coords: f.geometry.coordinates,
+            ai: f.properties.ai
+              ? JSON.parse(f.properties.ai)
+              : null,
+          });
+        });
+
+        map.on("mouseenter", "shara-circles", () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+
+        map.on("mouseleave", "shara-circles", () => {
+          map.getCanvas().style.cursor = "";
+        });
+      }
     });
 
     mapRef.current = map;
-    return () => map.remove();
+
+    return () => {
+      mapLoadedRef.current = false;
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
   // =========================
-  // UPDATE DATA
+  // UPDATE DATA (SAFE)
   // =========================
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    if (!mapLoadedRef.current) return;
 
     const src = map.getSource("shara-issues");
     if (!src) return;
@@ -101,7 +111,7 @@ export default function MainMap({
     src.setData({
       type: "FeatureCollection",
       features: issues
-        .filter((i) => Array.isArray(i.coords))
+        .filter((i) => Array.isArray(i.coords) && i.coords.length === 2)
         .map((i) => ({
           type: "Feature",
           properties: {
@@ -143,28 +153,23 @@ export default function MainMap({
             border: "1px solid rgba(255,255,255,0.15)",
           }}
         >
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>
-            How to use
-          </div>
-
-          <ul style={{ paddingLeft: 16, fontSize: 14, lineHeight: 1.6 }}>
-            <li>Click a pin to view road damage</li>
-            <li>Use <b>Add Issue</b> to report damage</li>
-            <li>Upload a photo for verification</li>
+          <b>How to use</b>
+          <ul style={{ paddingLeft: 16, fontSize: 14, marginTop: 8 }}>
+            <li>Click a pin to view issue</li>
+            <li>Add Issue to report damage</li>
+            <li>Upload image for proof</li>
           </ul>
-
           <button
             onClick={() => setHelpOpen(false)}
             style={{
-              marginTop: 12,
+              marginTop: 10,
               width: "100%",
-              padding: "8px 0",
+              padding: 8,
               borderRadius: 10,
               background: "rgba(255,255,255,0.1)",
               color: "white",
               border: "none",
               cursor: "pointer",
-              fontWeight: 600,
             }}
           >
             Got it
@@ -172,31 +177,26 @@ export default function MainMap({
         </div>
       )}
 
-      {/* FAB CLUSTER (CLEAN) */}
+      {/* FAB */}
       <div
         style={{
           position: "absolute",
           bottom: 30,
           right: 30,
           display: "flex",
-          alignItems: "center",
           gap: 12,
           zIndex: 9999,
         }}
       >
         <button
-          onClick={() => setHelpOpen((s) => !s)}
+          onClick={() => setHelpOpen((v) => !v)}
           style={{
             width: 48,
             height: 48,
             borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             background: "rgba(255,255,255,0.14)",
             backdropFilter: "blur(12px)",
             color: "white",
-            fontWeight: 800,
             fontSize: 18,
             border: "1px solid rgba(255,255,255,0.25)",
             cursor: "pointer",
@@ -211,14 +211,10 @@ export default function MainMap({
             height: 48,
             padding: "0 22px",
             borderRadius: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             background: "rgba(255,255,255,0.12)",
             backdropFilter: "blur(18px)",
             color: "white",
             fontWeight: 800,
-            fontSize: 16,
             border: "1px solid rgba(255,255,255,0.25)",
             cursor: "pointer",
           }}
