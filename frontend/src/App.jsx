@@ -73,24 +73,42 @@ export default function App() {
             Choose a display name. This will be visible in groups and chat.
           </p>
 
-          <input
-            autoFocus
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder="Your name"
-            style={{
-              width: "100%",
-              marginTop: 16,
-              padding: "14px 16px",
-              borderRadius: 14,
-              background: "rgba(255,255,255,0.12)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              color: "white",
-              fontSize: 16,
-              outline: "none",
-            }}
-          />
+{/* INPUT */}
+<div style={{ marginTop: 20 }}>
+  <input
+    autoFocus
+    value={nameInput}
+    onChange={(e) => setNameInput(e.target.value)}
+    onKeyDown={(e) => e.key === "Enter" && submit()}
+    placeholder="Your name"
+    maxLength={16}
+    style={{
+      width: "100%",
+      height: 52,                     // ✅ fixed, predictable
+      padding: "0 18px",              // ✅ horizontal only
+      borderRadius: 14,
+      background: "rgba(255,255,255,0.12)",
+      border: "1px solid rgba(255,255,255,0.22)",
+      color: "white",
+      fontSize: 16,
+      outline: "none",
+      boxSizing: "border-box",
+      lineHeight: "52px",             // ✅ hard lock vertical alignment
+    }}
+  />
+
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 12,
+      opacity: 0.55,
+      textAlign: "right",
+    }}
+  >
+    {nameInput.length}/16
+  </div>
+</div>
+
 
           <button
             onClick={submit}

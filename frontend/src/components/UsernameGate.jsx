@@ -2,6 +2,7 @@
 import { useState } from "react";
 
 const API = import.meta.env.VITE_API_URL;
+console.log("THIS UsernameGate FILE IS LOADED");
 
 export default function UsernameGate({ onDone }) {
   const [name, setName] = useState("");
@@ -35,10 +36,9 @@ export default function UsernameGate({ onDone }) {
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.55)",
-        backdropFilter: "blur(28px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        backdropFilter: "blur(24px)",
+        display: "grid",
+        placeItems: "center",
         zIndex: 100000,
       }}
     >
@@ -49,7 +49,7 @@ export default function UsernameGate({ onDone }) {
           padding: 28,
           borderRadius: 24,
           background:
-            "linear-gradient(180deg, rgba(28,28,28,0.92), rgba(18,18,18,0.92))",
+            "linear-gradient(180deg, rgba(28,28,28,0.95), rgba(18,18,18,0.95))",
           border: "1px solid rgba(255,255,255,0.14)",
           color: "white",
           boxShadow: "0 40px 120px rgba(0,0,0,0.75)",
@@ -57,11 +57,11 @@ export default function UsernameGate({ onDone }) {
         }}
       >
         {/* HEADER */}
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: 20 }}>
           <div
             style={{
               fontSize: 28,
-              fontWeight: 800,
+              fontWeight: 900,
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -74,46 +74,60 @@ export default function UsernameGate({ onDone }) {
           </div>
         </div>
 
-        {/* INPUT WRAPPER */}
-        <div
-          style={{
-            width: "100%",
-            height: 52,
-            borderRadius: 14,
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.18)",
-            padding: "0 16px",
-            boxSizing: "border-box",
+        {/* INPUT */}
+<div
+  style={{
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    marginTop: 12,
+  }}
+>
+  <div
+    style={{
+      width: "clamp(260px, 70vw, 340px)", // 🔥 MAGIC LINE
+      height: 52,
+      borderRadius: 14,
+      background: "rgba(255,255,255,0.08)",
+      border: "1px solid rgba(255,255,255,0.18)",
+      padding: "0 16px",
+      boxSizing: "border-box",
+      overflow: "hidden",
 
-            display: "flex",
-            alignItems: "center",
-            overflow: "hidden",
-          }}
-        >
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder="Your name"
-            maxLength={16}
-            autoFocus
-            style={{
-              width: "100%",
-              minWidth: 0, // 🔥 THIS fixes the spill
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              color: "white",
-              fontSize: 16,
-              lineHeight: "20px",
-              padding: 0,
-              margin: 0,
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
+      display: "flex",
+      alignItems: "center",
+    }}
+  >
+    <input
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      onKeyDown={(e) => e.key === "Enter" && submit()}
+      placeholder="Your name"
+      maxLength={16}
+      autoFocus
+      spellCheck={false}
+      style={{
+        width: "100%",
+        border: "none",
+        outline: "none",
+        background: "transparent",
+        color: "white",
+        fontSize: 16,
+        lineHeight: "1.2",
+        padding: 0,
+        margin: 0,
+        boxSizing: "border-box",
 
-        {/* CHAR COUNTER (optional but nice) */}
+        // kill browser weirdness
+        appearance: "none",
+        WebkitAppearance: "none",
+      }}
+    />
+  </div>
+</div>
+
+
+        {/* COUNTER */}
         <div
           style={{
             marginTop: 6,
@@ -130,9 +144,9 @@ export default function UsernameGate({ onDone }) {
           onClick={submit}
           disabled={loading}
           style={{
-            marginTop: 16,
+            marginTop: 18,
             width: "100%",
-            height: 50,
+            height: 52,
             borderRadius: 16,
             background: "linear-gradient(135deg,#22c55e,#16a34a)",
             color: "#041014",

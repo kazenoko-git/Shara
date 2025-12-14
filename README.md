@@ -27,7 +27,7 @@ Shara is a lightweight platform that enables people to **report local infrastruc
 
 ### 🖥️ Multi-platform
 - 🌐 Web app (Vercel)
-- 🖥️ Desktop app (Tauri – macOS & Windows)
+- 🖥️ Desktop app (Tauri – macOS & Windows) - coming soon
 
 ---
 
