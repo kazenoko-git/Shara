@@ -307,6 +307,23 @@ async fn create_issue(Json(input): Json<NewIssue>) -> (StatusCode, Json<Issue>) 
     (StatusCode::CREATED, Json(issue))
 }
 
+async fn delete_issue(
+    Path(id): Path<String>,
+) -> StatusCode {
+    let mut issues: Vec<Issue> = load_json("data/issues.json");
+    let before = issues.len();
+
+    issues.retain(|i| i.id != id);
+    save_json("data/issues.json", &issues);
+
+    if issues.len() < before {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::NOT_FOUND
+    }
+}
+
+
 // ============================
 // GROUPS
 // ============================
@@ -401,6 +418,7 @@ async fn main() {
     let app = Router::new()
         .route("/analyze", post(analyze))
         .route("/issues", get(get_issues).post(create_issue))
+        .route("/admin/issues/:id", delete(delete_issue))
         .route("/groups", get(get_groups).post(create_group))
         .route("/groups/:id/join", post(join_group))
         .route("/groups/:id/leave", post(leave_group))
