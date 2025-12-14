@@ -26,7 +26,7 @@ export default function AddIssue({ onBack, onSaved }) {
 
     map.current = new maplibregl.Map({
       container: mapEl.current,
-      style: "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json",
+      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center: [77.216721, 28.6448],
       zoom: 12,
       attributionControl: false,
