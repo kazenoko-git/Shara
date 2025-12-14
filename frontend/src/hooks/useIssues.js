@@ -1,6 +1,9 @@
 // frontend/src/hooks/useIssues.js
 import { useEffect, useState, useRef } from "react";
 
+const API = import.meta.env.VITE_API_URL;
+
+
 export default function useIssues(pollIntervalMs = 3000) {
   const [issues, setIssues] = useState([]);
   const mounted = useRef(true);
@@ -10,7 +13,7 @@ export default function useIssues(pollIntervalMs = 3000) {
 
     async function fetchIssues() {
       try {
-        const res = await fetch("http://localhost:8000/issues");
+        const res = await fetch(`${API}/issues`);
         if (!res.ok) throw new Error("failed fetch issues");
         const data = await res.json();
         if (mounted.current) setIssues(data);

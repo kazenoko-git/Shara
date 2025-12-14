@@ -4,6 +4,8 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function AddIssue({ onBack, onSaved }) {
   const mapEl = useRef(null);
   const map = useRef(null);
@@ -54,7 +56,7 @@ export default function AddIssue({ onBack, onSaved }) {
   const runAI = async (imageUrl) => {
     setAiLoading(true);
     try {
-      await fetch("http://localhost:8000/analyze", {
+      await fetch(`${API}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image_url: imageUrl }),
@@ -86,7 +88,7 @@ export default function AddIssue({ onBack, onSaved }) {
         createdAt: Date.now(),
       };
 
-      const res = await fetch("http://localhost:8000/issues", {
+      const res = await fetch(`${API}/issues`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

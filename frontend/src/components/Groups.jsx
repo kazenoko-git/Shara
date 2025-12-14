@@ -1,6 +1,8 @@
 // src/components/Groups.jsx
 import React, { useEffect, useState } from "react";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function Groups({ issue, user, onBack, onOpenChat }) {
   const [groups, setGroups] = useState([]);
   const [name, setName] = useState("");
@@ -12,7 +14,7 @@ export default function Groups({ issue, user, onBack, onOpenChat }) {
   useEffect(() => {
     if (!issue?.id) return;
 
-    fetch(`http://localhost:8000/groups?issueId=${issue.id}`)
+    fetch(`${API}/groups?issueId=${issue.id}`)
       .then((r) => r.json())
       .then(setGroups)
       .catch(console.error);
@@ -26,7 +28,7 @@ export default function Groups({ issue, user, onBack, onOpenChat }) {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/groups", {
+      const res = await fetch(`${API}/groups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -53,7 +55,7 @@ export default function Groups({ issue, user, onBack, onOpenChat }) {
   // JOIN GROUP
   // ---------------------------
   async function joinGroup(id) {
-    await fetch(`http://localhost:8000/groups/${id}/join`, {
+    await fetch(`${API}/groups/${id}/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id }),
@@ -72,7 +74,7 @@ export default function Groups({ issue, user, onBack, onOpenChat }) {
   // LEAVE GROUP
   // ---------------------------
   async function leaveGroup(id) {
-    await fetch(`http://localhost:8000/groups/${id}/leave`, {
+  await fetch(`${API}/groups/${id}/leave`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id }),

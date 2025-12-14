@@ -1,7 +1,7 @@
 // src/hooks/useAuth.js
 import { useEffect, useState } from "react";
 
-const API = "http://localhost:8000";
+const API = import.meta.env.VITE_API_URL;
 
 export default function useAuth() {
   const [user, setUser] = useState(null);
