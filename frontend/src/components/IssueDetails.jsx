@@ -12,7 +12,7 @@ export default function IssueDetails({ issue, onBack, openGroups }) {
 
   const prettyDate = (ts) => {
     try {
-      return ts ? new Date(ts).toLocaleString() : "";
+      return ts ? new Date(ts * 1000).toLocaleString() : "";
     } catch {
       return "";
     }
@@ -49,7 +49,6 @@ export default function IssueDetails({ issue, onBack, openGroups }) {
           zIndex: 9999,
           display: "flex",
           justifyContent: "center",
-          pointerEvents: "auto",
         }}
       >
         <div
@@ -144,7 +143,7 @@ export default function IssueDetails({ issue, onBack, openGroups }) {
             </div>
           )}
 
-          {/* SCROLLABLE CONTENT */}
+          {/* CONTENT */}
           <div
             style={{
               padding: 16,
@@ -152,19 +151,83 @@ export default function IssueDetails({ issue, onBack, openGroups }) {
               flex: 1,
             }}
           >
+            {/* DESCRIPTION */}
             <div style={{ lineHeight: 1.6, opacity: 0.9 }}>
               {issue.description || "No description provided."}
             </div>
 
             <div style={{ height: 16 }} />
 
+            {/* META */}
             <div style={{ fontSize: 13, opacity: 0.7 }}>
-              Reports: <strong>{issue.reports ?? 1}</strong> • Severity:{" "}
-              <strong>{issue.severity ?? "N/A"}</strong>
+              Reports: <strong>{issue.reports ?? 1}</strong> • AI Severity:{" "}
+              <strong>{issue.ai?.severity ?? "N/A"}</strong>
+            </div>
+
+            {/* AI ANALYSIS */}
+            <div style={{ height: 20 }} />
+
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 14,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                🤖 AI Analysis{" "}
+                <span style={{ fontSize: 12, opacity: 0.6 }}>
+                  (may be inaccurate)
+                </span>
+              </div>
+
+              {!issue.ai && (
+                <div style={{ fontSize: 13, opacity: 0.6 }}>
+                  No AI analysis available for this issue.
+                </div>
+              )}
+
+              {issue.ai && (
+                <>
+                  <div style={{ fontSize: 13, opacity: 0.85 }}>
+                    Detected issues:
+                  </div>
+
+                  <ul
+                    style={{
+                      paddingLeft: 18,
+                      marginTop: 6,
+                      marginBottom: 10,
+                    }}
+                  >
+                    {issue.ai.boxes.map((b, i) => (
+                      <li key={i} style={{ fontSize: 13 }}>
+                        <strong>{b.label}</strong>{" "}
+                        <span style={{ opacity: 0.6 }}>
+                          ({Math.round(b.confidence * 100)}% confidence)
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div style={{ fontSize: 13, opacity: 0.8 }}>
+                    Average confidence:{" "}
+                    <strong>
+                      {Math.round(issue.ai.avg_confidence * 100)}%
+                    </strong>
+                  </div>
+
+                  <div style={{ fontSize: 13, opacity: 0.8 }}>
+                    AI severity estimate:{" "}
+                    <strong>{issue.ai.severity}</strong> / 5
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* ACTIONS (STICKY) */}
+          {/* ACTIONS */}
           <div
             style={{
               padding: 14,

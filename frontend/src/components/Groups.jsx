@@ -1,12 +1,10 @@
 // src/components/Groups.jsx
 import React, { useEffect, useState } from "react";
 
-export default function Groups({ issue, onBack, onOpenChat }) {
+export default function Groups({ issue, user, onBack, onOpenChat }) {
   const [groups, setGroups] = useState([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const userId = localStorage.getItem("userId");
 
   // ---------------------------
   // LOAD GROUPS
@@ -34,7 +32,7 @@ export default function Groups({ issue, onBack, onOpenChat }) {
         body: JSON.stringify({
           issueId: issue.id,
           name: name.trim(),
-          userId,
+          userId: user.id,
         }),
       });
 
@@ -52,39 +50,54 @@ export default function Groups({ issue, onBack, onOpenChat }) {
   }
 
   // ---------------------------
-  // JOIN / LEAVE
+  // JOIN GROUP
   // ---------------------------
   async function joinGroup(id) {
     await fetch(`http://localhost:8000/groups/${id}/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId: user.id }),
     });
 
     setGroups((gs) =>
       gs.map((g) =>
-        g.id === id ? { ...g, members: [...g.members, userId] } : g
-      )
-    );
-  }
-
-  async function leaveGroup(id) {
-    await fetch(`http://localhost:8000/groups/${id}/leave`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    });
-
-    setGroups((gs) =>
-      gs.map((g) =>
-        g.id === id
-          ? { ...g, members: g.members.filter((m) => m !== userId) }
+        g.id === id && !g.members.includes(user.id)
+          ? { ...g, members: [...g.members, user.id] }
           : g
       )
     );
   }
 
-  const isMember = (g) => g.members.includes(userId);
+  // ---------------------------
+  // LEAVE GROUP
+  // ---------------------------
+  async function leaveGroup(id) {
+    await fetch(`http://localhost:8000/groups/${id}/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id }),
+    });
+
+    setGroups((gs) =>
+      gs.map((g) =>
+        g.id === id
+          ? { ...g, members: g.members.filter((m) => m !== user.id) }
+          : g
+      )
+    );
+  }
+
+  // ---------------------------
+  // OPEN CHAT (AUTO-JOIN)
+  // ---------------------------
+  async function openChat(group) {
+    if (!group.members.includes(user.id)) {
+      await joinGroup(group.id);
+    }
+    onOpenChat(group);
+  }
+
+  const isMember = (g) => g.members.includes(user.id);
 
   // ---------------------------
   // UI
@@ -245,7 +258,7 @@ export default function Groups({ issue, onBack, onOpenChat }) {
                 )}
 
                 <button
-                  onClick={() => onOpenChat(g)}
+                  onClick={() => openChat(g)}
                   style={{
                     marginLeft: "auto",
                     padding: "8px 12px",

@@ -1,7 +1,8 @@
 use axum::{
-    extract::{Path, Query, Json},
+    extract::{Path, Query, Json, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::{get, post, delete},
+    response::sse::{Event, KeepAlive, Sse},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -10,14 +11,38 @@ use std::{
     fs,
     net::SocketAddr,
     path::Path as FsPath,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH, Duration},
 };
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
+use tokio::sync::broadcast;
+use async_stream::stream;
+use futures_core::Stream;
+use std::convert::Infallible;
+use reqwest::multipart;
+use serde_json::Value;
+
+// ============================
+// APP STATE
+// ============================
+
+#[derive(Clone)]
+struct AppState {
+    msg_tx: broadcast::Sender<Message>,
+}
 
 // ============================
 // MODELS
 // ============================
+
+#[derive(Serialize, Deserialize, Clone)]
+struct User {
+    id: String,
+    username: String,
+    createdAt: u64,
+}
+
+// ---------- AI MODELS ----------
 
 #[derive(Serialize, Deserialize, Clone)]
 struct BBox {
@@ -35,6 +60,8 @@ struct AiResult {
     avg_confidence: f32,
     severity: u8,
 }
+
+// ---------- CORE MODELS ----------
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Issue {
@@ -63,6 +90,7 @@ struct Message {
     id: String,
     groupId: String,
     senderId: String,
+    senderName: String,
     text: String,
     createdAt: u64,
 }
@@ -70,6 +98,11 @@ struct Message {
 // ============================
 // INPUT DTOs
 // ============================
+
+#[derive(Deserialize)]
+struct CreateUserReq {
+    username: String,
+}
 
 #[derive(Deserialize)]
 struct NewIssue {
@@ -94,6 +127,7 @@ struct MemberReq {
 #[derive(Deserialize)]
 struct NewMessage {
     senderId: String,
+    senderName: String,
     text: String,
 }
 
@@ -124,7 +158,7 @@ fn load_json<T: for<'de> Deserialize<'de>>(path: &str) -> Vec<T> {
     fs::read_to_string(path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_else(|| vec![])
+        .unwrap_or_default()
 }
 
 fn save_json<T: Serialize>(path: &str, data: &Vec<T>) {
@@ -133,7 +167,7 @@ fn save_json<T: Serialize>(path: &str, data: &Vec<T>) {
 }
 
 // ============================
-// AI LOGIC
+// AI HELPERS
 // ============================
 
 fn iou(a: &BBox, b: &BBox) -> f32 {
@@ -150,7 +184,7 @@ fn iou(a: &BBox, b: &BBox) -> f32 {
 }
 
 fn merge_boxes(boxes: Vec<BBox>) -> Vec<BBox> {
-    let mut merged: Vec<BBox> = vec![];
+    let mut merged = vec![];
 
     for b in boxes {
         let mut absorbed = false;
@@ -173,16 +207,8 @@ fn merge_boxes(boxes: Vec<BBox>) -> Vec<BBox> {
     merged
 }
 
-fn compute_severity(boxes: &Vec<BBox>, reports: u32) -> u8 {
-    let base = boxes.len() as i32;
-    let authority_boost = (reports / 3) as i32;
-    let raw = base + authority_boost;
-
-    raw.clamp(0, 5) as u8
-}
-
 // ============================
-// ANALYZE (ULTRALYTICS)
+// AI ANALYZE (ULTRALYTICS)
 // ============================
 
 async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
@@ -208,14 +234,14 @@ async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
         }
     };
 
-    let form = reqwest::multipart::Form::new()
-        .text("model", "https://hub.ultralytics.com/models/7j3uWTMc5oTCmiUkbzCx")
+    let form = multipart::Form::new()
+        .text("model", "https://hub.ultralytics.com/models/nNbNzUo22v46beB7tHyQ")
         .text("imgsz", "640")
-        .text("conf", "0.25")
+        .text("conf", "0.20")
         .text("iou", "0.45")
         .part(
             "file",
-            reqwest::multipart::Part::bytes(img_bytes.to_vec())
+            multipart::Part::bytes(img_bytes.to_vec())
                 .file_name("img.jpg")
                 .mime_str("image/jpeg")
                 .unwrap(),
@@ -229,8 +255,7 @@ async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
         .await
         .unwrap();
 
-    let text = resp.text().await.unwrap();
-    let json: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+    let json: Value = resp.json().await.unwrap_or_default();
 
     let mut boxes = vec![];
 
@@ -238,12 +263,12 @@ async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
         for img in images {
             if let Some(results) = img["results"].as_array() {
                 for r in results {
-                    let box_obj = &r["box"];
+                    let b = &r["box"];
                     boxes.push(BBox {
-                        x1: box_obj["x1"].as_f64().unwrap_or(0.0) as f32,
-                        y1: box_obj["y1"].as_f64().unwrap_or(0.0) as f32,
-                        x2: box_obj["x2"].as_f64().unwrap_or(0.0) as f32,
-                        y2: box_obj["y2"].as_f64().unwrap_or(0.0) as f32,
+                        x1: b["x1"].as_f64().unwrap_or(0.0) as f32,
+                        y1: b["y1"].as_f64().unwrap_or(0.0) as f32,
+                        x2: b["x2"].as_f64().unwrap_or(0.0) as f32,
+                        y2: b["y2"].as_f64().unwrap_or(0.0) as f32,
                         confidence: r["confidence"].as_f64().unwrap_or(0.0) as f32,
                         label: r["name"].as_str().unwrap_or("unknown").to_string(),
                     });
@@ -253,18 +278,40 @@ async fn analyze(Json(req): Json<AnalyzeReq>) -> Json<AiResult> {
     }
 
     let boxes = merge_boxes(boxes);
-    let avg = if boxes.is_empty() {
-        0.0
-    } else {
-        boxes.iter().map(|b| b.confidence).sum::<f32>() / boxes.len() as f32
-    };
-    let severity = compute_severity(&boxes, 1);
 
-    Json(AiResult {
-        boxes,
-        avg_confidence: avg,
-        severity,
-    })
+let count = boxes.len();
+let avg = if count == 0 {
+    0.0
+} else {
+    boxes.iter().map(|b| b.confidence).sum::<f32>() / count as f32
+};
+
+let severity = count.min(5) as u8;
+
+Json(AiResult {
+    boxes,
+    avg_confidence: avg,
+    severity,
+})
+
+}
+
+// ============================
+// USERS
+// ============================
+
+async fn create_user(Json(req): Json<CreateUserReq>) -> (StatusCode, Json<User>) {
+    let user = User {
+        id: format!("usr_{}", Uuid::new_v4()),
+        username: req.username,
+        createdAt: now(),
+    };
+
+    let mut users: Vec<User> = load_json("data/users.json");
+    users.push(user.clone());
+    save_json("data/users.json", &users);
+
+    (StatusCode::CREATED, Json(user))
 }
 
 // ============================
@@ -307,12 +354,9 @@ async fn create_issue(Json(input): Json<NewIssue>) -> (StatusCode, Json<Issue>) 
     (StatusCode::CREATED, Json(issue))
 }
 
-async fn delete_issue(
-    Path(id): Path<String>,
-) -> StatusCode {
+async fn delete_issue(Path(id): Path<String>) -> StatusCode {
     let mut issues: Vec<Issue> = load_json("data/issues.json");
     let before = issues.len();
-
     issues.retain(|i| i.id != id);
     save_json("data/issues.json", &issues);
 
@@ -323,36 +367,9 @@ async fn delete_issue(
     }
 }
 
-
 // ============================
 // GROUPS
 // ============================
-
-async fn join_group(Path(id): Path<String>, Json(req): Json<MemberReq>) -> StatusCode {
-    let mut groups: Vec<Group> = load_json("data/groups.json");
-
-    for g in &mut groups {
-        if g.id == id && !g.members.contains(&req.userId) {
-            g.members.push(req.userId.clone());
-        }
-    }
-
-    save_json("data/groups.json", &groups);
-    StatusCode::OK
-}
-
-async fn leave_group(Path(id): Path<String>, Json(req): Json<MemberReq>) -> StatusCode {
-    let mut groups: Vec<Group> = load_json("data/groups.json");
-
-    for g in &mut groups {
-        if g.id == id {
-            g.members.retain(|m| m != &req.userId);
-        }
-    }
-
-    save_json("data/groups.json", &groups);
-    StatusCode::OK
-}
 
 async fn get_groups(Query(q): Query<HashMap<String, String>>) -> Json<Vec<Group>> {
     let groups: Vec<Group> = load_json("data/groups.json");
@@ -379,8 +396,30 @@ async fn create_group(Json(req): Json<CreateGroupReq>) -> (StatusCode, Json<Grou
     (StatusCode::CREATED, Json(group))
 }
 
+async fn join_group(Path(id): Path<String>, Json(req): Json<MemberReq>) -> StatusCode {
+    let mut groups: Vec<Group> = load_json("data/groups.json");
+    for g in &mut groups {
+        if g.id == id && !g.members.contains(&req.userId) {
+            g.members.push(req.userId.clone());
+        }
+    }
+    save_json("data/groups.json", &groups);
+    StatusCode::OK
+}
+
+async fn leave_group(Path(id): Path<String>, Json(req): Json<MemberReq>) -> StatusCode {
+    let mut groups: Vec<Group> = load_json("data/groups.json");
+    for g in &mut groups {
+        if g.id == id {
+            g.members.retain(|m| m != &req.userId);
+        }
+    }
+    save_json("data/groups.json", &groups);
+    StatusCode::OK
+}
+
 // ============================
-// MESSAGES
+// MESSAGES + SSE
 // ============================
 
 async fn get_messages(Path(id): Path<String>) -> Json<Vec<Message>> {
@@ -389,6 +428,7 @@ async fn get_messages(Path(id): Path<String>) -> Json<Vec<Message>> {
 }
 
 async fn post_message(
+    State(state): State<AppState>,
     Path(id): Path<String>,
     Json(input): Json<NewMessage>,
 ) -> (StatusCode, Json<Message>) {
@@ -396,6 +436,7 @@ async fn post_message(
         id: format!("msg_{}", Uuid::new_v4()),
         groupId: id,
         senderId: input.senderId,
+        senderName: input.senderName,
         text: input.text,
         createdAt: now(),
     };
@@ -404,7 +445,29 @@ async fn post_message(
     msgs.push(msg.clone());
     save_json("data/messages.json", &msgs);
 
+    let _ = state.msg_tx.send(msg.clone());
     (StatusCode::CREATED, Json(msg))
+}
+
+async fn stream_messages(
+    State(state): State<AppState>,
+    Path(group_id): Path<String>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let mut rx = state.msg_tx.subscribe();
+
+    let stream = stream! {
+        while let Ok(msg) = rx.recv().await {
+            if msg.groupId == group_id {
+                yield Ok(Event::default().data(serde_json::to_string(&msg).unwrap()));
+            }
+        }
+    };
+
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("ping"),
+    )
 }
 
 // ============================
@@ -415,7 +478,11 @@ async fn post_message(
 async fn main() {
     dotenvy::dotenv().ok();
 
+    let (tx, _) = broadcast::channel::<Message>(100);
+    let state = AppState { msg_tx: tx };
+
     let app = Router::new()
+        .route("/users", post(create_user))
         .route("/analyze", post(analyze))
         .route("/issues", get(get_issues).post(create_issue))
         .route("/admin/issues/:id", delete(delete_issue))
@@ -423,6 +490,8 @@ async fn main() {
         .route("/groups/:id/join", post(join_group))
         .route("/groups/:id/leave", post(leave_group))
         .route("/groups/:id/messages", get(get_messages).post(post_message))
+        .route("/groups/:id/stream", get(stream_messages))
+        .with_state(state)
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)

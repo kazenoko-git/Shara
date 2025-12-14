@@ -188,22 +188,36 @@ export default function MainMap({
           zIndex: 9999,
         }}
       >
-        <button
-          onClick={() => setHelpOpen((v) => !v)}
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.14)",
-            backdropFilter: "blur(12px)",
-            color: "white",
-            fontSize: 18,
-            border: "1px solid rgba(255,255,255,0.25)",
-            cursor: "pointer",
-          }}
-        >
-          ?
-        </button>
+       <button
+  onClick={() => setHelpOpen((v) => !v)}
+  style={{
+    width: 48,
+    height: 48,
+    aspectRatio: "1 / 1",          // ← ABSOLUTE KEY
+    boxSizing: "border-box",       // ← PREVENT BORDER STRETCH
+    borderRadius: "999px",         // ← TRUE CIRCLE, NOT 50%
+    background: "rgba(255,255,255,0.14)",
+    backdropFilter: "blur(14px)",
+    border: "1px solid rgba(255,255,255,0.25)",
+    color: "white",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    fontSize: 22,
+    fontWeight: 700,
+    lineHeight: "1",
+    transform: "translateY(1px)",  // ← OPTICAL CENTER (SAFE)
+
+    cursor: "pointer",
+  }}
+>
+  ?
+</button>
+
+
+
 
         <button
           onClick={onAddIssue}
