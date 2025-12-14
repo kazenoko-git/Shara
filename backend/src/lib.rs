@@ -438,6 +438,12 @@ async fn leave_group(Path(id): Path<String>, Json(req): Json<MemberReq>) -> Stat
     StatusCode::OK
 }
 
+async fn purge_messages(State(state): State<AppState>) -> StatusCode {
+    let db = state.db.lock().unwrap();
+    db.execute("DELETE FROM messages", []).unwrap();
+    StatusCode::NO_CONTENT
+}
+
 async fn get_messages(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -555,6 +561,7 @@ pub async fn run_server(port: u16) {
         .route("/groups/:id/leave", post(leave_group))
         .route("/groups/:id/messages", get(get_messages).post(post_message))
         .route("/groups/:id/stream", get(stream_messages))
+        .route("/admin/purge", post(purge_messages))
         .with_state(state)
         .layer(
             CorsLayer::new()

@@ -136,6 +136,31 @@ export default function MainMap({
     <div style={{ width: "100%", height: "100vh", position: "relative" }}>
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
 
+      {/* APP TITLE */}
+<div
+  style={{
+    position: "absolute",
+    top: 24,
+    left: 24,
+    zIndex: 9999,
+
+    padding: "10px 16px",
+    borderRadius: 14,
+
+    backdropFilter: "blur(14px)",
+    border: "1px solid rgba(255,255,255,0.12)",
+
+    fontSize: 22,
+    fontWeight: 900,
+    letterSpacing: 1,
+
+    color: "white",
+  }}
+>
+  Shara
+</div>
+
+
       {/* HELP WINDOW */}
       {helpOpen && (
         <div
