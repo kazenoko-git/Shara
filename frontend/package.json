@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@arcgis/core": "^4.34.8",
+    "@tauri-apps/api": "^2.9.1",
     "axios": "^1.13.2",
     "firebase": "^12.6.0",
     "mapbox-gl": "^3.16.0",

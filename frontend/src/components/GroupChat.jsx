@@ -138,8 +138,9 @@ export default function GroupChat({ group, user, onMinimize }) {
         <strong>{group.name}</strong>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <HeaderButton onClick={() => setMinimized(true)}>—</HeaderButton>
-          <HeaderButton onClick={onMinimize}>✕</HeaderButton>
+          <HeaderButton onClick={() => setMinimized(true)} icon="min" />
+<HeaderButton onClick={onMinimize} icon="close" />
+
         </div>
       </div>
 
@@ -236,25 +237,30 @@ export default function GroupChat({ group, user, onMinimize }) {
   );
 }
 
-function HeaderButton({ children, onClick }) {
+function HeaderButton({ icon, onClick }) {
+  const glyph = icon === "min" ? "–" : "×"; // use EN DASH + MULTIPLY
+
   return (
     <button
       onClick={onClick}
       style={{
-        width: 36,
-        height: 36,
-        display: "grid",
-        placeItems: "center",
+        width: 32,
+        height: 32,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         borderRadius: 10,
         background: "rgba(255,255,255,0.14)",
         border: "1px solid rgba(255,255,255,0.28)",
         color: "white",
         cursor: "pointer",
         fontSize: 18,
-        lineHeight: 1,
+        fontWeight: 600,
+        lineHeight: "18px",
+        padding: 0,
       }}
     >
-      {children}
+      {glyph}
     </button>
   );
 }

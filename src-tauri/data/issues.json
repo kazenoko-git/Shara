@@ -1,0 +1,20 @@
+[
+  {
+    "id": "iss_420e6c2f-df87-4fe2-a3ce-e722c3aecddc",
+    "title": "Test",
+    "description": "",
+    "coords": [
+      77.19509166650488,
+      28.672817429610745
+    ],
+    "imageUrl": "https://res.cloudinary.com/dyw9ge1wl/image/upload/v1765728377/x1mkb8mivb92gdlcbtqg.png",
+    "category": "unverified",
+    "ai": {
+      "boxes": [],
+      "avg_confidence": 0.0,
+      "severity": 0
+    },
+    "reports": 1,
+    "createdAt": 1765728384
+  }
+]
